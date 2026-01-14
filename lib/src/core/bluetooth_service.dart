@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:obd2/src/functions.dart';
 
 /// A helper class to manage Bluetooth Low Energy (BLE) lifecycle and
 /// connectivity specifically for OBD2 adapters.

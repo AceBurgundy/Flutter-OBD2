@@ -88,9 +88,9 @@ Planned:
 ### 1️⃣ Initialize Bluetooth
 
 ```dart
-await OBD2BluetoothService.initialize();
+await BluetoothService.initialize();
 
-final service = OBD2BluetoothService();
+final service = BluetoothService();
 final device = await service.connect(selectedDevice);
 ```
 

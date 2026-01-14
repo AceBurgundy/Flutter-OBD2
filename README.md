@@ -1,4 +1,4 @@
-# 🚗 Flutter-OBD2 – Modern Flutter OBD-II SDK
+# 🚗 Flutter-OBD2 – Modern Flutter OBD-II SDK (Being Worked On)
 
 [![pub.dev](https://img.shields.io/pub/v/obd2.svg)](https://pub.dev/packages/obd2)
 [![license](https://img.shields.io/badge/license-MPL%202.0-blue.svg)](https://www.mozilla.org/en-US/MPL/2.0/)

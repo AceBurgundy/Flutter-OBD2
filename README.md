@@ -90,7 +90,7 @@ Planned:
 ```dart
 await BluetoothService.initialize();
 
-final service = BluetoothService();
+final service = OBD2BluetoothService();
 final device = await service.connect(selectedDevice);
 ```
 

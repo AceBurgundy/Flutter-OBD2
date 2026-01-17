@@ -68,7 +68,7 @@ Stream<Map<String, TelemetryValue>>
 **Key Change:** The adapter now contains the OBD2 engine. Users interact directly with the adapter:
 
 ```dart
-scanner.telemetryStreamFor([rpm, coolantTemp]).listen((data) {
+scanner.streamTelemetry({ on: [RpmTelemetry, CoolantTelemetry] }).listen((data) {
   print('RPM: ${data[rpm]?.value}');
 });
 ```
@@ -109,7 +109,7 @@ await scanner.connect(selectedDevice);
 ### 2️⃣ Stream Telemetry in One Block
 
 ```dart
-scanner.telemetryStreamFor([rpm, coolantTemp]).listen((data) {
+scanner.streamTelemetry({ on: [RpmTelemetry, CoolantTelemetry] }).listen((data) {
   print('RPM: ${data[rpm]?.value}');
   print('Coolant Temp: ${data[coolantTemp]?.value}');
 });

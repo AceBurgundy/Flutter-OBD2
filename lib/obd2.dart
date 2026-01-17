@@ -3,6 +3,6 @@
 /// More dartdocs go here.
 library;
 
-export 'src/core/obd2_base.dart';
+export 'src/core/adapter.dart';
 
 // TODO: Export any libraries intended for clients of this package.

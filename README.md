@@ -1,10 +1,3 @@
-Here’s an updated README reflecting all the recent architecture and API changes, including:
-
-* `OBD2` engine integrated into adapters
-* Single-block telemetry streaming (`telemetryStreamFor`)
-* Bluetooth adapter as the primary transport
-* Removed older patterns and clarified future plans
-
 # 🚗 Flutter-OBD2 – Modern Flutter OBD-II SDK (Being Worked On)
 
 [![pub.dev](https://img.shields.io/pub/v/obd2.svg)](https://pub.dev/packages/obd2)

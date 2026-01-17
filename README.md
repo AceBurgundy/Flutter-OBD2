@@ -1,3 +1,10 @@
+Here’s an updated README reflecting all the recent architecture and API changes, including:
+
+* `OBD2` engine integrated into adapters
+* Single-block telemetry streaming (`telemetryStreamFor`)
+* Bluetooth adapter as the primary transport
+* Removed older patterns and clarified future plans
+
 # 🚗 Flutter-OBD2 – Modern Flutter OBD-II SDK (Being Worked On)
 
 [![pub.dev](https://img.shields.io/pub/v/obd2.svg)](https://pub.dev/packages/obd2)
@@ -7,7 +14,7 @@
 
 A **modern, strongly-typed, diagnostic-standard–aware OBD-II SDK for Flutter** built for dashboards, telemetry streaming, and professional vehicle diagnostics.
 
-This package is designed to work with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and emphasizes:
+This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and emphasizes:
 
 * 🚀 **Live telemetry streaming**
 * 🧠 **Typed telemetry models**
@@ -51,23 +58,29 @@ flutter pub get
 
 ## 🧠 Architecture Overview
 
-This package is built with **clean layering and protocol abstraction**:
+The SDK now uses **adapter-based OBD2 engines**:
 
 ```
-Bluetooth Adapter
-      ↓
-OBD2BluetoothService
-      ↓
-BluetoothOBD2
-      ↓
-DiagnosticStandard (SAE J1979 / ISO 15765 / ...)
-      ↓
-PIDInformation
-      ↓
-TelemetryValue<T>
-      ↓
+BluetoothAdapterOBD2  →  OBD2 engine
+         ↓
+ DiagnosticStandard (SAE J1979 / ISO 15765 / ...)
+         ↓
+       PIDInformation
+         ↓
+   TelemetryValue<T>
+         ↓
 Stream<Map<String, TelemetryValue>>
 ```
+
+**Key Change:** The adapter now contains the OBD2 engine. Users interact directly with the adapter:
+
+```dart
+scanner.telemetryStreamFor([rpm, coolantTemp]).listen((data) {
+  print('RPM: ${data[rpm]?.value}');
+});
+```
+
+No separate OBD2 instance is needed.
 
 ## 🧩 Diagnostic Standards
 
@@ -85,57 +98,31 @@ Planned:
 
 ## 🚀 Quick Start
 
-### 1️⃣ Initialize Bluetooth
+### 1️⃣ Retrieve and Connect a Bluetooth Device
 
 ```dart
-await BluetoothService.initialize();
+// Initialize Flutter Blue Plus
+await FlutterBluePlus.adapterState.first;
 
-final service = OBD2BluetoothService();
-final device = await service.connect(selectedDevice);
+// User retrieves bonded devices
+final devices = await FlutterBluePlus.bondedDevices;
+final selectedDevice = devices.first;
+
+// Create scanner and connect (auto-initializes OBD-II)
+final scanner = BluetoothAdapterOBD2();
+await scanner.connect(selectedDevice);
 ```
 
-### 2️⃣ Create OBD2 Instance
+### 2️⃣ Stream Telemetry in One Block
 
 ```dart
-final obd2 = BluetoothOBD2(
-  bluetoothService: service,
-  diagnosticStandard: SaeJ1979Standard(),
-);
-
-obd2.connection = device!;
-```
-
-### 3️⃣ Initialize Adapter (AT Commands)
-
-```dart
-await obd2.initializeAdapter();
-```
-
-This automatically sends:
-
-* `AT Z` (reset)
-* `AT E0` (echo off)
-* `AT L0` (linefeeds off)
-* `AT SP 0` (auto protocol)
-
-### 4️⃣ Stream Live Telemetry
-
-```dart
-obd2.listenTelemetry(
-  on: [
-    rpm, // from diagnostic_standards/sae_j1979/parameter_ids.dart
-  ],
-);
-```
-
-### 5️⃣ Listen to Telemetry Stream
-
-```dart
-obd2.telemetryStream.listen((telemetry) {
-  final rpmValue = telemetry['010C'] as RpmTelemetry;
-  print('RPM: ${rpmValue.value}');
+scanner.telemetryStreamFor([rpm, coolantTemp]).listen((data) {
+  print('RPM: ${data[rpm]?.value}');
+  print('Coolant Temp: ${data[coolantTemp]?.value}');
 });
 ```
+
+✅ **No separate OBD2 engine needed.** Adapter handles all PID requests, parsing, and streaming.
 
 ## 📊 Telemetry Models
 
@@ -155,8 +142,6 @@ class RpmTelemetry extends TelemetryValue<double> {
   RpmTelemetry(super.value);
 }
 ```
-
-This makes the SDK:
 
 * Type-safe
 * Analyzer-friendly
@@ -222,8 +207,6 @@ Perfect for:
 
 This project is licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.
 
-You are free to:
-
 * Use in commercial projects
 * Modify the source
 * Distribute binaries
@@ -243,7 +226,7 @@ Contributions are welcome!
 * New telemetry PIDs
 * Documentation improvements
 
-Feel free to open an issue or submit a pull request.
+Open an issue or submit a pull request.
 
 ## ⭐ Support the Project
 

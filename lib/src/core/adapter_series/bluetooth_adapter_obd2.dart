@@ -1,256 +1,157 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:math_expressions/math_expressions.dart';
-import 'package:obd2/src/core/telemetry.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:obd2/src/functions.dart';
+import '../adapter_obd2.dart';
 
-import '../../models.dart';
-import '../adapter.dart';
-import '../diagnostic_standards/standard_abstract.dart';
-
-/// AT = Attention Command (ELM327 adapter control commands)
-/// ECU = Engine Control Unit
-/// PID = Parameter Identifier (OBD-II telemetry code)
 /// BLE = Bluetooth Low Energy
-
-/// Defines the operational mode used when communicating with the ECU.
+/// Adapter for Bluetooth OBD-II scanners that extends the OBD2 engine.
 ///
-/// Each mode corresponds to a standardized OBD-II request category.
-enum OBDMode {
-  /// Requests real-time powertrain data such as
-  /// engine speed, vehicle speed, and coolant temperature.
-  currentPowertrainData,
+/// This class now implements [AdapterOBD2] and contains the OBD-II logic
+/// for:
+/// - Sending PID commands
+/// - Streaming telemetry
+/// - Parsing ECU responses
+/// - Evaluating formulas
+class BluetoothAdapterOBD2 extends AdapterOBD2 {
+  /// Connected Bluetooth device instance.
+  BluetoothDevice? _connectedDevice;
 
-  /// Requests static vehicle information such as
-  /// VIN, calibration identifiers, and ECU metadata.
-  vehicleInformation,
-}
+  /// GATT characteristic used to write commands to the adapter.
+  BluetoothCharacteristic? _writeCharacteristic;
 
-/// Adapter-based OBD-II engine that communicates with the ECU
-/// and streams live telemetry.
-///
-/// This class now extends the [AdapterOBD2] abstraction, so any
-/// transport layer (Bluetooth, USB, etc.) can be used.
-///
-/// Responsibilities:
-/// - Initialize the adapter using AT commands
-/// - Queue and stream multiple PIDs
-/// - Parse and evaluate telemetry formulas
-/// - Emit typed telemetry values
-class OBD2 {
-  /// Underlying OBD-II transport adapter.
-  final AdapterOBD2 _adapter;
+  /// Stream controller emitting incoming raw ASCII bytes.
+  final StreamController<List<int>> _incomingDataController =
+  StreamController.broadcast();
 
-  /// Diagnostic standard used for building PID requests
-  /// and parsing ECU responses.
-  final DiagnosticStandard _diagnosticStandard;
+  /// Subscription to BLE notification updates.
+  StreamSubscription<List<int>>? _notificationSubscription;
 
-  /// Last command sent to the ECU.
-  String _latestCommand = '';
+  /// Creates a Bluetooth OBD-II adapter instance.
+  ///
+  /// The adapter is not connected until [connect] is called.
+  BluetoothAdapterOBD2({required super.diagnosticStandard});
 
-  /// Numeric identifier describing the last request type.
-  int _requestCode = 0;
+  /// Indicates whether the Bluetooth adapter is connected.
+  @override
+  bool get isConnected => _connectedDevice != null;
 
-  /// Indicates whether adapter initialization is in progress.
-  bool _isInitializingAdapter = false;
+  /// Stream of raw ASCII bytes received from the adapter.
+  @override
+  Stream<List<int>> get incomingData => _incomingDataController.stream;
 
-  /// Queue of telemetry PIDs currently being streamed.
-  final List<PIDInformation> _telemetryQueue = [];
-
-  /// Controller emitting aggregated telemetry updates.
-  final StreamController<Map<String, TelemetryValue>>
-  _telemetryStreamController = StreamController.broadcast();
-
-  /// Cached parsed expressions per PID for performance.
-  final Map<String, Expression> _expressionCache = {};
-
-  OBD2({
-    required AdapterOBD2 adapter,
-    required DiagnosticStandard diagnosticStandard,
-  })  : _adapter = adapter,
-        _diagnosticStandard = diagnosticStandard;
-
-  /// Stream of live telemetry updates.
-  Stream<Map<String, TelemetryValue>> get telemetryStream =>
-      _telemetryStreamController.stream;
-
-  /// Connects to the adapter and automatically initializes it.
+  /// Establishes a BLE connection to a target OBD-II adapter
+  /// and automatically initializes the diagnostic adapter.
+  ///
+  /// Discovers services, locates a writable characteristic,
+  /// subscribes to notifications, and sends AT initialization commands.
+  ///
+  /// ### Parameters:
+  /// - (`BluetoothDevice device`): Target OBD-II Bluetooth adapter.
   ///
   /// ### Throws:
-  /// - (`StateError`) If the adapter is not connected.
-  /// - (`Exception`) If the connection or initialization fails.
-  Future<void> connect() async {
-    if (!_adapter.isConnected) {
-      throw StateError('Adapter is not connected. Call connect() on the adapter first.');
-    }
-
-    await _initializeAdapter();
-    _startListening();
-  }
-
-  /// Initializes the diagnostic adapter using AT commands
-  /// defined by the active diagnostic standard.
-  Future<void> _initializeAdapter() async {
-    _isInitializingAdapter = true;
-
+  /// - (`StateError`): If no writable characteristic is found.
+  /// - (`Exception`): If the connection or initialization fails.
+  Future<void> connect(BluetoothDevice device) async {
     try {
-      for (final String command in _diagnosticStandard.initializationCommands) {
-        await _write(command, 100);
-        await Future.delayed(const Duration(milliseconds: 150));
+      // Connect to device
+      await device.connect(autoConnect: false, license: License.free);
+      _connectedDevice = device;
+
+      // Discover services
+      final List<BluetoothService> services = await device.discoverServices();
+
+      for (final BluetoothService service in services) {
+        for (final BluetoothCharacteristic characteristic
+        in service.characteristics) {
+          // Identify writable characteristic
+          if (characteristic.properties.write ||
+              characteristic.properties.writeWithoutResponse) {
+            _writeCharacteristic = characteristic;
+          }
+
+          // Subscribe to notifications
+          if (characteristic.properties.notify ||
+              characteristic.properties.indicate) {
+            await characteristic.setNotifyValue(true);
+            _notificationSubscription =
+                characteristic.lastValueStream.listen((List<int> data) {
+                  if (!_incomingDataController.isClosed) {
+                    _incomingDataController.add(data);
+                  }
+                });
+          }
+        }
       }
+
+      if (_writeCharacteristic == null) {
+        throw StateError(
+          'No writable Bluetooth characteristic found on OBD-II adapter.',
+        );
+      }
+
+      // === Adapter auto-initialization ===
+      initializeAdapter();
     } catch (error, stackTrace) {
       logError(
         error,
         stackTrace,
-        message: 'Failed to initialize diagnostic adapter.',
+        message: 'Failed to connect and initialize Bluetooth OBD-II adapter.',
       );
       rethrow;
-    } finally {
-      _isInitializingAdapter = false;
     }
   }
 
-  /// Starts streaming telemetry for the given PIDs and returns
-  /// a single combined stream for immediate subscription.
+  /// Sends raw ASCII bytes to the adapter.
   ///
   /// ### Parameters:
-  /// - (`List<PIDInformation>`): List of telemetry PIDs to stream.
-  ///
-  /// ### Returns:
-  /// - (`Stream<Map<String, TelemetryValue>>`): Live telemetry updates.
-  ///
-  /// ### Usage:
-  /// ```dart
-  /// scanner.streamTelemetry(on: [rpm, coolantTemp]).listen((data) {
-  ///   print('RPM: ${data[rpm]?.value}');
-  /// });
-  /// ```
-  Stream<Map<String, TelemetryValue>> streamTelemetry({ required List<PIDInformation> on }) {
-    if (on.isEmpty) {
-      throw Exception("No telemetry PID's provided");
-    }
-
-    _telemetryQueue..clear()..addAll(on);
-    _sendNextTelemetryRequest();
-
-    return _telemetryStreamController.stream;
-  }
-
-  /// Begins listening to adapter notifications.
-  void _startListening() {
-    String responseBuffer = '';
-
-    _adapter.incomingData.listen((List<int> data) {
-      responseBuffer += utf8.decode(data);
-
-      if (responseBuffer.contains('>')) {
-        _processRawResponse(responseBuffer);
-        responseBuffer = '';
-      }
-    });
-  }
-
-  /// Stops telemetry streaming and clears internal state.
-  void stop() {
-    _telemetryQueue.clear();
-  }
-
-  /// Processes a raw ECU response string.
-  void _processRawResponse(String rawResponse) {
-    if (_isInitializingAdapter || _telemetryQueue.isEmpty) return;
-
-    final String cleanedResponse = rawResponse
-        .replaceAll(RegExp(r'[\n\r> ]'), '')
-        .replaceAll('SEARCHING...', '');
-
-    final PIDInformation parameterID = _telemetryQueue.removeAt(0);
-
-    try {
-      final TelemetryValue telemetryValue =
-      _evaluatePIDResponse(parameterID, cleanedResponse);
-
-      _telemetryStreamController.add({parameterID.parameterID: telemetryValue});
-    } catch (error, stackTrace) {
-      logError(
-        error,
-        stackTrace,
-        message: 'Failed to process telemetry response.',
-      );
-    } finally {
-      _telemetryQueue.add(parameterID);
-      _sendNextTelemetryRequest();
-    }
-  }
-
-  /// Sends the next PID request in the telemetry queue.
-  void _sendNextTelemetryRequest() {
-    if (_telemetryQueue.isEmpty) return;
-
-    final PIDInformation parameterID = _telemetryQueue.first;
-    final String command =
-    _diagnosticStandard.buildParameterIDRequest(parameterID);
-
-    _write(command, 400);
-  }
-
-  /// Evaluates a PID response into a typed telemetry value.
-  TelemetryValue _evaluatePIDResponse(
-      PIDInformation parameterID, String response) {
-    final List<String> bytes = _diagnosticStandard.extractDataBytes(
-      response: response,
-      pIDInfo: parameterID,
-    );
-
-    String formula = parameterID.formula;
-
-    for (int index = 0; index < bytes.length; index++) {
-      formula = formula.replaceAll(
-        '[$index]',
-        int.parse(bytes[index], radix: 16).toString(),
-      );
-    }
-
-    final Expression expression = _expressionCache.putIfAbsent(
-      parameterID.parameterID,
-          () => GrammarParser().parse(formula),
-    );
-
-    final double value = RealEvaluator().evaluate(expression).toDouble();
-
-    // Currently only RPM is typed as a TelemetryValue child.
-    if (parameterID.parameterID == '010C') {
-      return RpmTelemetry(value);
-    }
-
-    throw UnsupportedError(
-        'Unsupported telemetry PID: ${parameterID.parameterID}');
-  }
-
-  /// Sends a raw command to the adapter.
-  ///
-  /// ### Parameters:
-  /// - (`String command`): The ASCII command string.
-  /// - (`int requestCode`): Internal request identifier.
+  /// - (`List<int>`): ASCII-encoded command bytes.
   ///
   /// ### Throws:
-  /// - (`StateError`) If the adapter is not connected.
-  /// - (`Exception`) If the write operation fails.
-  Future<void> _write(String command, int requestCode) async {
-    if (!_adapter.isConnected) {
-      throw StateError('Adapter is not connected.');
+  /// - (`StateError`): If no device is connected.
+  /// - (`Exception`): If the write operation fails.
+  @override
+  Future<void> write(List<int> data) async {
+    if (_writeCharacteristic == null || _connectedDevice == null) {
+      throw StateError('Bluetooth adapter is not connected.');
     }
 
-    _latestCommand = command;
-    _requestCode = requestCode;
-
     try {
-      await _adapter.write(utf8.encode('$command\r\n'));
+      await _writeCharacteristic!.write(
+        data,
+        withoutResponse: _writeCharacteristic!.properties.writeWithoutResponse,
+      );
     } catch (error, stackTrace) {
       logError(
         error,
         stackTrace,
-        message: 'Failed to send command to diagnostic adapter.',
+        message: 'Failed to write data to Bluetooth OBD-II adapter.',
+      );
+      rethrow;
+    }
+  }
+
+  /// Disconnects from the Bluetooth adapter and releases resources.
+  ///
+  /// Cancels notifications, disconnects the device, and clears internal refs.
+  @override
+  Future<void> disconnect() async {
+    try {
+      await _notificationSubscription?.cancel();
+      _notificationSubscription = null;
+
+      if (_connectedDevice != null) {
+        await _connectedDevice!.disconnect();
+      }
+
+      _connectedDevice = null;
+      _writeCharacteristic = null;
+    } catch (error, stackTrace) {
+      logError(
+        error,
+        stackTrace,
+        message: 'Failed to disconnect Bluetooth OBD-II adapter.',
       );
       rethrow;
     }

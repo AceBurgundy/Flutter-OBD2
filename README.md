@@ -1,30 +1,30 @@
-# 🚗 Flutter-OBD2 – Modern Flutter OBD-II SDK (Being Worked On)
+# 🚗 Flutter-OBD2 — A Modern Flutter OBD-II SDK
 
 [![pub.dev](https://img.shields.io/pub/v/obd2.svg)](https://pub.dev/packages/obd2)
 [![license](https://img.shields.io/badge/license-MPL%202.0-blue.svg)](https://www.mozilla.org/en-US/MPL/2.0/)
 [![platform](https://img.shields.io/badge/platform-Flutter-blue.svg)](https://flutter.dev)
 [![bluetooth](https://img.shields.io/badge/Bluetooth-BLE-0096FF.svg)](#)
 
-A **modern, strongly-typed, diagnostic-standard–aware OBD-II SDK for Flutter** built for dashboards, telemetry streaming, and professional vehicle diagnostics.
+A **modern, diagnostic-standard–aware OBD-II SDK for Flutter** designed for **live telemetry**, **clean APIs**, and **extensible vehicle diagnostics**.
 
-This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and emphasizes:
+This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and focuses on:
 
-* 🚀 **Live telemetry streaming**
-* 🧠 **Typed telemetry models**
-* 🧩 **Pluggable diagnostic standards**
-* ⚡ **High performance with cached formula evaluation**
-* 🧼 **Clean architecture & strict separation of concerns**
+* 🚀 Simple, session-based telemetry streaming
+* 🧠 Diagnostic-standard-scoped PID definitions
+* 🧩 Pluggable transport adapters (Bluetooth, Serial, future)
+* ⚡ High-performance formula evaluation with caching
+* 🧼 Clean architecture with minimal abstraction overhead
 
-## ✨ Features
+## ✨ Key Features
 
-✅ Bluetooth Low Energy (BLE) OBD-II support
-✅ Live RPM and telemetry streaming
-✅ Strongly typed telemetry values
-✅ Diagnostic standard abstraction (SAE J1979, ISO 15765, more coming)
-✅ Cached PID formula parsing (huge performance boost)
-✅ Adapter auto-configuration (AT command pipeline)
-✅ Flutter-native `Stream` API
-✅ Dashboard-ready architecture
+* ✅ Bluetooth Low Energy (BLE) OBD-II adapters
+* ✅ Live telemetry streaming (RPM, coolant temp, etc.)
+* ✅ Diagnostic-standard abstraction (SAE J1979 today)
+* ✅ Standard-scoped PID definitions (no global PID confusion)
+* ✅ Cached math expression evaluation
+* ✅ Adapter auto-initialization (AT command pipeline)
+* ✅ Simple `double` telemetry values (no unnecessary wrappers)
+* ✅ Dashboard-friendly, Flutter-native API
 
 ## 📦 Installation
 
@@ -51,33 +51,32 @@ flutter pub get
 
 ## 🧠 Architecture Overview
 
-The SDK now uses **adapter-based OBD2 engines**:
+The SDK follows a **clear responsibility split**:
 
 ```
-BluetoothAdapterOBD2  →  OBD2 engine
-         ↓
- DiagnosticStandard (SAE J1979 / ISO 15765 / ...)
-         ↓
-       PIDInformation
-         ↓
-   TelemetryValue<T>
-         ↓
-Stream<Map<String, TelemetryValue>>
+BluetoothAdapterOBD2
+        ↓
+  DiagnosticStandard (SAE J1979, etc.)
+        ↓
+     DetailedPID (ID + description + formula)
+        ↓
+     double (telemetry value)
 ```
 
-**Key Change:** The adapter now contains the OBD2 engine. Users interact directly with the adapter:
+### Key ideas
 
-```dart
-scanner.streamTelemetry({ on: [RpmTelemetry, CoolantTelemetry] }).listen((data) {
-  print('RPM: ${data[rpm]?.value}');
-});
-```
+* The **adapter** owns the OBD-II engine
+* The **diagnostic standard** defines how data is requested and parsed
+* **PIDs are scoped to their diagnostic standard**
+* Telemetry values are returned as plain `double`
 
-No separate OBD2 instance is needed.
+No global PID maps.
+No magic strings.
+No unnecessary wrappers.
 
 ## 🧩 Diagnostic Standards
 
-Diagnostic standards are **runtime-injectable**, not hardcoded.
+Diagnostic standards are **explicit and injectable**.
 
 Currently supported:
 
@@ -89,120 +88,121 @@ Planned:
 * ⏳ ISO 9141
 * ⏳ ISO 14230 (KWP2000)
 
+Each standard:
+
+* Defines its own supported PIDs
+* Knows how to build ECU requests
+* Knows how to parse ECU responses
+
 ## 🚀 Quick Start
 
-### 1️⃣ Retrieve and Connect a Bluetooth Device
+### 1️⃣ Connect to an OBD-II Adapter
 
 ```dart
-// Initialize Flutter Blue Plus
 await FlutterBluePlus.adapterState.first;
 
-// User retrieves bonded devices
 final devices = await FlutterBluePlus.bondedDevices;
-final selectedDevice = devices.first;
+final device = devices.first;
 
-// Create scanner and connect (auto-initializes OBD-II)
-final scanner = BluetoothAdapterOBD2();
-await scanner.connect(selectedDevice);
+final DiagnosticStandard standard = SaeJ1979();
+
+final scanner = BluetoothAdapterOBD2(
+  diagnosticStandard: standard,
+);
+
+await scanner.connect(device); // auto-initializes adapter
 ```
 
-### 2️⃣ Stream Telemetry in One Block
+### 2️⃣ Start a Telemetry Session
+
+Telemetry is streamed through a **session object**:
 
 ```dart
-scanner.streamTelemetry({ on: [RpmTelemetry, CoolantTelemetry] }).listen((data) {
-  print('RPM: ${data[rpm]?.value}');
-  print('Coolant Temp: ${data[coolantTemp]?.value}');
-});
+final session = scanner.stream(
+  parameterIDs: [standard.detailedPIDs.rpm],
+  onData: (data) {
+    final rpm = data[standard.detailedPIDs.rpm];
+    if (rpm != null) {
+      print('RPM: $rpm');
+    }
+  },
+);
 ```
 
-✅ **No separate OBD2 engine needed.** Adapter handles all PID requests, parsing, and streaming.
-
-## 📊 Telemetry Models
-
-All telemetry values are **strictly typed**:
+Stop the session when done:
 
 ```dart
-abstract class TelemetryValue<T> {
-  final T value;
-  final DateTime timestamp;
-}
+session.stop();
 ```
 
-Example:
+## 📊 Telemetry Model
+
+Telemetry values are returned as **plain doubles**.
+
+Why?
+
+* No fake abstraction
+* No PID-specific subclasses
+* Formula already defines meaning and unit
 
 ```dart
-class RpmTelemetry extends TelemetryValue<double> {
-  RpmTelemetry(super.value);
-}
+Map<DetailedPID, double>
 ```
 
-* Type-safe
-* Analyzer-friendly
-* UI-friendly
+Each `DetailedPID` contains:
+
+* Parameter ID (`010C`)
+* Human-readable description
+* Formula used to compute the value
+
+## 🧠 PID Scoping (Important)
+
+PIDs are **scoped to their diagnostic standard**:
+
+```dart
+standard.detailedPIDs.rpm
+```
+
+This avoids ambiguity when multiple standards define similar concepts
+(e.g. RPM in SAE J1979 vs another protocol).
 
 ## ⚡ Performance Optimizations
 
-* 🧠 Cached parsed expressions per PID
+* 🧠 Cached parsed math expressions per PID
 * 🧮 One-time formula compilation
-* 🔁 Continuous ECU-synchronized polling
+* 🔁 ECU-synchronized polling loop
 * 🚫 No repeated parsing or reflection
 
-Perfect for:
+Designed for:
 
 * Real-time dashboards
-* HUD displays
-* Track telemetry
-* Motorcycle & automotive apps
+* HUDs
+* Vehicle monitoring apps
 
-## 🔮 Future Plans
+## 🔮 Roadmap
 
-🚧 **Diagnostic Trouble Codes (DTCs)**
+* 🚧 Diagnostic Trouble Codes (DTCs)
+* 🚧 Clear fault codes
+* 🚧 Additional diagnostic standards
+* 🚧 More telemetry PIDs
+* 🚧 Protocol auto-detection
+* 🚧 Multi-PID batching optimizations
 
-* Read active & stored fault codes
-* Standard-specific decoding
-* Human-readable descriptions
-
-🚧 **Erase Diagnostic Codes**
-
-* Clear ECU fault memory
-* Reset warning lights
-
-🚧 **More Diagnostic Standards**
-
-* ISO 15765 (CAN)
-* ISO 9141
-* ISO 14230 (KWP2000)
-
-🚧 **Advanced Telemetry**
-
-* Vehicle speed
-* Coolant temperature
-* Throttle position
-* Fuel level
-* Intake pressure
-
-🚧 **Protocol Auto-Detection**
-
-* Automatically select correct diagnostic standard
-
-🚧 **Multi-PID Batching**
-
-* Stream multiple telemetry values simultaneously
-* Typed per PID
-
-## 🧪 Stability & API Status
+## 🧪 API Status
 
 * 🚀 Actively developed
-* 🧪 API evolving but stable
+* 🧪 API stabilizing
 * 🧱 Designed for long-term extensibility
+
+Breaking changes will be documented clearly.
 
 ## 📄 License
 
-This project is licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.
+Licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.
 
-* Use in commercial projects
-* Modify the source
-* Distribute binaries
+* ✔ Commercial use allowed
+* ✔ Modification allowed
+* ✔ Binary distribution allowed
 
 You must:
 
@@ -212,19 +212,19 @@ You must:
 
 ## 🤝 Contributing
 
-Contributions are welcome!
+Contributions are welcome:
 
 * Bug reports
-* Diagnostic standard implementations
-* New telemetry PIDs
+* New diagnostic standards
+* Additional PID definitions
 * Documentation improvements
 
 Open an issue or submit a pull request.
 
 ## ⭐ Support the Project
 
-If this project helps you build something cool:
+If this project helped you:
 
 * ⭐ Star the repo
 * 🐛 Report issues
-* 🧠 Share ideas
+* 💡 Share ideas

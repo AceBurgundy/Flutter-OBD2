@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:math_expressions/math_expressions.dart';
-import 'package:obd2/src/core/telemetry.dart';
 import 'package:obd2/src/functions.dart';
 
 import '../models.dart';
@@ -125,65 +124,69 @@ abstract class AdapterOBD2 {
 
   /// Starts a telemetry streaming session.
   ///
+  /// Only PIDs that are part of the current diagnostic standard
+  /// (`diagnosticStandard.allowedDetailedPIDs`) are allowed. Passing
+  /// a PID from another standard will throw an error.
+  ///
   /// ### Parameters:
-  /// - (`List<PIDInformation>`): PIDs to poll continuously.
-  /// - (`void Function(Map<PIDInformation, TelemetryValue>)`):
+  /// - (`List<DetailedPID>`): PIDs to poll continuously.
+  /// - (`void Function(Map<DetailedPID, double>)`):
   ///   Callback invoked when telemetry data is received.
   ///
   /// ### Returns:
   /// - (`TelemetrySession`): Active streaming session instance.
-  ///
-  /// ### Usage:
-  /// ```dart
-  /// final session = scanner.stream(
-  ///   parameterIDs: [rpm],
-  ///   onData: (data) {
-  ///     print(data[rpm]?.value);
-  ///   },
-  /// );
-  ///
-  /// session.stop();
-  /// ```
   TelemetrySession stream({
-    required List<PIDInformation> parameterIDs,
-    required void Function(Map<PIDInformation, TelemetryValue>) onData,
+    required List<DetailedPID> detailedPIDs,
+    required void Function(Map<DetailedPID, double>) onData,
   }) {
     if (!isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
-    final List<PIDInformation> telemetryQueue =
-    List<PIDInformation>.from(parameterIDs);
+    if (detailedPIDs.isEmpty) {
+      throw ArgumentError(
+        'At least one PID must be provided to start a telemetry stream.',
+      );
+    }
 
+    // Enforce standard ownership
+    final allowed = diagnosticStandard.allowedDetailedPIDs;
+
+    for (final pid in detailedPIDs) {
+      if (!allowed.contains(pid)) {
+        throw ArgumentError(
+          'PID "${pid.name}" (${pid.parameterID}) does not belong to '
+              'the "${diagnosticStandard.name}" diagnostic standard.',
+        );
+      }
+    }
+
+    final List<DetailedPID> telemetryQueue = List.of(detailedPIDs);
     String responseBuffer = '';
 
-    final StreamSubscription<List<int>> subscription =
-    incomingData.listen((List<int> data) {
+    final subscription = incomingData.listen((data) {
       responseBuffer += utf8.decode(data);
 
       if (!responseBuffer.contains('>')) return;
 
-      final String rawResponse = responseBuffer;
+      final rawResponse = responseBuffer;
       responseBuffer = '';
 
-      if (_isInitializingAdapter || telemetryQueue.isEmpty) return;
+      if (_isInitializingAdapter) return;
 
-      final PIDInformation parameterID =
-      telemetryQueue.removeAt(0);
+      final DetailedPID currentPID = telemetryQueue.removeAt(0);
 
       try {
-        final TelemetryValue value =
-        _evaluatePIDResponse(parameterID, rawResponse);
-
-        onData({parameterID: value});
+        final value = _evaluatePIDResponse(currentPID, rawResponse);
+        onData({currentPID: value});
       } catch (error, stackTrace) {
         logError(
           error,
           stackTrace,
-          message: 'Failed to process telemetry response.',
+          message: 'Failed to process telemetry for ${currentPID.name}',
         );
       } finally {
-        telemetryQueue.add(parameterID);
+        telemetryQueue.add(currentPID);
         _requestNextPID(telemetryQueue.first);
       }
     });
@@ -195,16 +198,16 @@ abstract class AdapterOBD2 {
   }
 
   /// Sends the next PID request to the ECU.
-  void _requestNextPID(PIDInformation parameterID) {
+  void _requestNextPID(DetailedPID parameterID) {
     final String command =
-    diagnosticStandard.buildParameterIDRequest(parameterID);
+    diagnosticStandard.buildDetailedPIDRequest(parameterID);
 
     _sendCommand(command, requestCode: 400);
   }
 
   /// Evaluates an ECU response into a typed telemetry value.
-  TelemetryValue _evaluatePIDResponse(
-      PIDInformation parameterID,
+  double _evaluatePIDResponse(
+      DetailedPID detailedPID,
       String rawResponse,
       ) {
     final String cleanedResponse = rawResponse
@@ -214,10 +217,10 @@ abstract class AdapterOBD2 {
     final List<String> bytes =
     diagnosticStandard.extractDataBytes(
       response: cleanedResponse,
-      pIDInfo: parameterID,
+      detailedPID: detailedPID,
     );
 
-    String formula = parameterID.formula;
+    String formula = detailedPID.formula;
 
     for (int index = 0; index < bytes.length; index++) {
       formula = formula.replaceAll(
@@ -227,20 +230,11 @@ abstract class AdapterOBD2 {
     }
 
     final Expression expression = _expressionCache.putIfAbsent(
-      parameterID.parameterID,
+      detailedPID.parameterID,
           () => GrammarParser().parse(formula),
     );
 
-    final double value =
-    RealEvaluator().evaluate(expression).toDouble();
-
-    if (parameterID.parameterID == '010C') {
-      return RpmTelemetry(value);
-    }
-
-    throw UnsupportedError(
-      'Unsupported telemetry PID: ${parameterID.parameterID}',
-    );
+    return RealEvaluator().evaluate(expression).toDouble();
   }
 
   /// Sends a raw command to the adapter.

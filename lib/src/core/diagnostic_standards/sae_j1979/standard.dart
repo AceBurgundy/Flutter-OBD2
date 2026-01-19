@@ -1,10 +1,18 @@
-import '../standard_abstract.dart';
-import '../../../models.dart';
-
-import 'parameter_ids.dart' as pids;
+import 'package:obd2/obd2.dart';
 
 /// SAE J1979 diagnostic standard implementation.
-class SaeJ1979Standard implements DiagnosticStandard {
+class SaeJ1979 extends DiagnosticStandard {
+
+  static final DetailedPIDs _detailedPIDCatalog = DetailedPIDs();
+
+  /// Namespace for SAE J1979 Parameter Identifiers.
+  ///
+  /// These PIDs are **static** and **standard-scoped**, meaning:
+  /// - They belong to SAE J1979
+  /// - They are not instance-bound
+  /// - They do not pollute the global namespace
+  DetailedPIDs get detailedPIDs => _detailedPIDCatalog;
+
   @override
   String get name => 'SAE J1979';
 
@@ -17,23 +25,22 @@ class SaeJ1979Standard implements DiagnosticStandard {
   ];
 
   @override
-  List<PIDInformation> get supportedParameterIDS => const [
-    pids.rpm,
+  List<DetailedPID> get allowedDetailedPIDs => [
+    detailedPIDs.rpm
     // later: speed, coolant, throttle, etc.
   ];
 
   @override
-  String buildParameterIDRequest(PIDInformation pIDInfo) {
-    return pIDInfo.parameterID;
+  String buildDetailedPIDRequest(DetailedPID detailedPID) {
+    return detailedPID.parameterID;
   }
 
   @override
   List<String> extractDataBytes({
     required String response,
-    required PIDInformation pIDInfo,
+    required DetailedPID detailedPID,
   }) {
-    final String header =
-        '41${pIDInfo.parameterID.substring(pIDInfo.parameterID.length - 2)}';
+    final String header = '41${detailedPID.parameterID.substring(detailedPID.parameterID.length - 2)}';
 
     String cleaned = response;
     if (cleaned.contains(header) == true) {

@@ -1,4 +1,4 @@
-import '../../models.dart';
+import '../../../obd2.dart';
 
 /// Defines the contract for an OBD-II diagnostic standard.
 ///
@@ -15,14 +15,14 @@ abstract class DiagnosticStandard {
   List<String> get initializationCommands;
 
   /// All supported parameter identifiers for this standard.
-  List<PIDInformation> get supportedParameterIDS;
+  List<DetailedPID> get allowedDetailedPIDs;
 
   /// Builds a request command for a given PID.
-  String buildParameterIDRequest(PIDInformation pIDInfo);
+  String buildDetailedPIDRequest(DetailedPID detailedPID);
 
   /// Extracts raw data bytes from an ECU response.
   List<String> extractDataBytes({
     required String response,
-    required PIDInformation pIDInfo,
+    required DetailedPID detailedPID,
   });
 }

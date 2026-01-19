@@ -92,7 +92,7 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
       }
 
       // === Adapter auto-initialization ===
-      initializeAdapter();
+      await initializeAdapter();
     } catch (error, stackTrace) {
       logError(
         error,

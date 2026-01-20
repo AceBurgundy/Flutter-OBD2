@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:obd2/obd2.dart';
+import 'package:permission_handler/permission_handler.dart'; // 1. Add this import
 
 void main() {
   runApp(const MyApp());
@@ -11,9 +12,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: OBD2DemoPage(),
-    );
+    return const MaterialApp(home: OBD2DemoPage());
   }
 }
 
@@ -45,44 +44,76 @@ class _OBD2DemoPageState extends State<OBD2DemoPage> {
     await FlutterBluePlus.adapterState.first;
   }
 
-  /// Opens a dialog listing paired Bluetooth devices
-  Future<void> _showPairedDevicesDialog() async {
-    final List<BluetoothDevice> devices =
-    await FlutterBluePlus.bondedDevices;
+  /// NEW: Robust permission handler
+  Future<bool> _requestBluetoothPermissions() async {
+    // Android 12 (API 31) and above require these specific permissions
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.location,
+    ].request();
 
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Paired Devices'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: devices.isEmpty
-                ? const Text('No paired devices found.')
-                : ListView.builder(
-              shrinkWrap: true,
-              itemCount: devices.length,
-              itemBuilder: (context, index) {
-                final device = devices[index];
-                return ListTile(
-                  title: Text(
-                    device.platformName.isNotEmpty
-                        ? device.platformName
-                        : device.remoteId.toString(),
-                  ),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    await _connectToDevice(device);
-                  },
-                );
-              },
-            ),
+    if (statuses[Permission.bluetoothConnect]!.isGranted && statuses[Permission.bluetoothScan]!.isGranted) {
+      return true;
+    } else {
+      // If denied, you can show a snackbar or alert
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bluetooth permissions are required to scan.'),
           ),
         );
-      },
-    );
+      }
+
+      return false;
+    }
+  }
+
+  /// Opens a dialog listing paired Bluetooth devices
+  Future<void> _showPairedDevicesDialog() async {
+    // 2. Check permissions BEFORE calling bondedDevices
+    bool granted = await _requestBluetoothPermissions();
+    if (!granted) return;
+
+    try {
+      final List<BluetoothDevice> devices = await FlutterBluePlus.bondedDevices;
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Paired Devices'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: devices.isEmpty
+                  ? const Text('No paired devices found.')
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: devices.length,
+                      itemBuilder: (context, index) {
+                        final device = devices[index];
+                        return ListTile(
+                          title: Text(
+                            device.platformName.isNotEmpty
+                                ? device.platformName
+                                : device.remoteId.toString(),
+                          ),
+                          onTap: () async {
+                            Navigator.of(context).pop();
+                            await _connectToDevice(device);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          );
+        },
+      );
+    } catch (error) {
+      debugPrint("Error fetching bonded devices: $error");
+    }
   }
 
   /// Connects to the selected Bluetooth device
@@ -95,15 +126,16 @@ class _OBD2DemoPageState extends State<OBD2DemoPage> {
     scanner?.disconnect();
     telemetrySession?.stop();
 
-    scanner = BluetoothAdapterOBD2(
-      diagnosticStandard: saeJ1979Standard,
-    );
+    scanner = BluetoothAdapterOBD2(diagnosticStandard: saeJ1979Standard);
 
-    await scanner!.connect(device);
-
-    setState(() {
-      connectedDevice = device;
-    });
+    try {
+      await scanner!.connect(device);
+      setState(() {
+        connectedDevice = device;
+      });
+    } catch (error) {
+      debugPrint("Connection error: $error");
+    }
   }
 
   /// Starts live telemetry streaming
@@ -143,7 +175,6 @@ class _OBD2DemoPageState extends State<OBD2DemoPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            /// Connection status
             Text(
               isConnected
                   ? 'Connected to: ${connectedDevice?.platformName ?? connectedDevice?.remoteId}'
@@ -153,34 +184,22 @@ class _OBD2DemoPageState extends State<OBD2DemoPage> {
                 color: isConnected ? Colors.green : Colors.red,
               ),
             ),
-
             const SizedBox(height: 24),
-
-            /// Paired devices button
             ElevatedButton(
               onPressed: _showPairedDevicesDialog,
               child: const Text('PAIRED DEVICES'),
             ),
-
             const SizedBox(height: 16),
-
-            /// Live stream button
             ElevatedButton(
               onPressed: isConnected ? _startLiveStream : null,
               child: const Text('LIVE STREAM'),
             ),
-
             const SizedBox(height: 32),
-
-            /// RPM display
             Text(
               retrievedRPM == null
                   ? 'RPM: --'
                   : 'RPM: ${retrievedRPM!.toStringAsFixed(0)}',
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
           ],
         ),

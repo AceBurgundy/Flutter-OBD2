@@ -5,13 +5,13 @@
 [![platform](https://img.shields.io/badge/platform-Flutter-blue.svg)](https://flutter.dev)
 [![bluetooth](https://img.shields.io/badge/Bluetooth-BLE-0096FF.svg)](#)
 
-A **modern, diagnostic-standard–aware OBD-II SDK for Flutter** designed for **live telemetry**, **clean APIs**, and **extensible vehicle diagnostics**.
+A **modern, diagnostic-standard–aware OBD-II SDK for Flutter**, designed for **live telemetry streaming**, **clean APIs**, and **long-term extensibility**.
 
 This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and focuses on:
 
 * 🚀 Simple, session-based telemetry streaming
-* 🧠 Diagnostic-standard-scoped PID definitions
-* 🧩 Pluggable transport adapters (Bluetooth, Serial, future)
+* 🧠 Diagnostic-standard–scoped PID definitions
+* 🧩 Pluggable transport adapters (Bluetooth today, more later)
 * ⚡ High-performance formula evaluation with caching
 * 🧼 Clean architecture with minimal abstraction overhead
 
@@ -19,7 +19,7 @@ This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II ad
 
 * ✅ Bluetooth Low Energy (BLE) OBD-II adapters
 * ✅ Live telemetry streaming (RPM, coolant temp, etc.)
-* ✅ Diagnostic-standard abstraction (SAE J1979 today)
+* ✅ Diagnostic stdard abstraction (SAE J1979 today)
 * ✅ Standard-scoped PID definitions (no global PID confusion)
 * ✅ Cached math expression evaluation
 * ✅ Adapter auto-initialization (AT command pipeline)
@@ -28,7 +28,7 @@ This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II ad
 
 ## 📦 Installation
 
-Add the package to your `pubspec.yaml`:
+Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -51,7 +51,7 @@ flutter pub get
 
 ## 🧠 Architecture Overview
 
-The SDK follows a **clear responsibility split**:
+The SDK follows a **clear and intentional responsibility split**:
 
 ```
 BluetoothAdapterOBD2
@@ -60,29 +60,33 @@ BluetoothAdapterOBD2
         ↓
      DetailedPID (ID + description + formula)
         ↓
-     double (telemetry value)
+        double
 ```
 
-### Key ideas
+### Core Principles
 
-* The **adapter** owns the OBD-II engine
-* The **diagnostic standard** defines how data is requested and parsed
+* The **adapter** owns the OBD-II engine and polling loop
+* The **diagnostic standard** defines:
+
+  * Supported PIDs
+  * How requests are built
+  * How ECU responses are parsed
 * **PIDs are scoped to their diagnostic standard**
-* Telemetry values are returned as plain `double`
+* Telemetry values are returned as **plain `double`**
 
 No global PID maps.
 No magic strings.
-No unnecessary wrappers.
+No unnecessary telemetry subclasses.
 
 ## 🧩 Diagnostic Standards
 
 Diagnostic standards are **explicit and injectable**.
 
-Currently supported:
+### Currently Supported
 
 * ✅ **SAE J1979** (OBD-II Mode 01 telemetry)
 
-Planned:
+### Planned
 
 * ⏳ ISO 15765 (CAN)
 * ⏳ ISO 9141
@@ -90,9 +94,9 @@ Planned:
 
 Each standard:
 
-* Defines its own supported PIDs
-* Knows how to build ECU requests
-* Knows how to parse ECU responses
+* Defines its own PID namespace
+* Exposes its supported telemetry
+* Knows how to parse ECU responses correctly
 
 ## 🚀 Quick Start
 
@@ -113,13 +117,13 @@ final scanner = BluetoothAdapterOBD2(
 await scanner.connect(device); // auto-initializes adapter
 ```
 
-### 2️⃣ Start a Telemetry Session
+### 2️⃣ Start a Telemetry Streaming Session
 
 Telemetry is streamed through a **session object**:
 
 ```dart
 final session = scanner.stream(
-  parameterIDs: [standard.detailedPIDs.rpm],
+  detailedPIDs: [standard.detailedPIDs.rpm],
   onData: (data) {
     final rpm = data[standard.detailedPIDs.rpm];
     if (rpm != null) {
@@ -137,13 +141,7 @@ session.stop();
 
 ## 📊 Telemetry Model
 
-Telemetry values are returned as **plain doubles**.
-
-Why?
-
-* No fake abstraction
-* No PID-specific subclasses
-* Formula already defines meaning and unit
+Telemetry values are returned as **plain `double`**.
 
 ```dart
 Map<DetailedPID, double>
@@ -151,9 +149,16 @@ Map<DetailedPID, double>
 
 Each `DetailedPID` contains:
 
-* Parameter ID (`010C`)
+* Parameter ID (e.g. `010C`)
 * Human-readable description
 * Formula used to compute the value
+
+### Why no PID-specific telemetry classes?
+
+* The formula already defines meaning and units
+* Avoids unnecessary class explosion
+* Keeps the API simple and predictable
+* Easier dashboard and chart integration
 
 ## 🧠 PID Scoping (Important)
 
@@ -165,6 +170,9 @@ standard.detailedPIDs.rpm
 
 This avoids ambiguity when multiple standards define similar concepts
 (e.g. RPM in SAE J1979 vs another protocol).
+
+No global `rpm`.
+No guessing which standard it belongs to.
 
 ## ⚡ Performance Optimizations
 
@@ -184,7 +192,7 @@ Designed for:
 * 🚧 Diagnostic Trouble Codes (DTCs)
 * 🚧 Clear fault codes
 * 🚧 Additional diagnostic standards
-* 🚧 More telemetry PIDs
+* 🚧 Expanded telemetry coverage
 * 🚧 Protocol auto-detection
 * 🚧 Multi-PID batching optimizations
 
@@ -228,3 +236,4 @@ If this project helped you:
 * ⭐ Star the repo
 * 🐛 Report issues
 * 💡 Share ideas
+

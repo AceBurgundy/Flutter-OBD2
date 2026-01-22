@@ -1,4 +1,4 @@
-# 🚗 Flutter-OBD2 — A Modern Flutter OBD-II SDK
+# 🚗 Flutter-OBD2 - A Modern Flutter OBD-II SDK
 
 A **modern, diagnostic-standard–aware OBD-II SDK for Flutter**, designed for **live telemetry streaming**, **clean APIs**, and **long-term extensibility**.
 

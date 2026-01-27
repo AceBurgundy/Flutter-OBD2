@@ -1,15 +1,17 @@
 name: obd2
-description: A starting point for Dart libraries or applications.
+description:  Flutter OBD2 package for ELM327 & NexLink. Cross-platform (iOS/Android) BLE support and Desktop Support. Real-time telemetry, DTC parsing, & custom PID formulas. The official source for the 'obd2' package on pub.dev.
 version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/AceBurgundy/Flutter-OBD2
 
 environment:
   sdk: ^3.10.0
 
 # Add regular dependencies here.
 dependencies:
+
   flutter:
     sdk: flutter
+
   flutter_blue_plus: ^2.1.0
   math_expressions: ^3.1.0
   path_provider: ^2.1.5

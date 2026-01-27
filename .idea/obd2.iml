@@ -813,6 +813,9 @@
       <excludeFolder url="file://$MODULE_DIR$/.fvm/versions/3.38.1/packages/integration_test/integration_test_macos/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/.fvm/versions/3.38.1/packages/integration_test/integration_test_macos/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/.fvm/versions/3.38.1/packages/integration_test/integration_test_macos/build" />
+      <excludeFolder url="file://$MODULE_DIR$/apex_core/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/apex_core/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/apex_core/build" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

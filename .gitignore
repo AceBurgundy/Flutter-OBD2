@@ -10,9 +10,4 @@ pubspec.lock
 .fvm/
 
 # Example package
-example/
-example/lib/main.dart
-example/pubspec.yaml
-example/android/app/src/main/AndroidManifest.xml
-example/lib/main.dart
-example/*
+apex_core/

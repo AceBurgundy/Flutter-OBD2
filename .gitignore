@@ -8,3 +8,11 @@ pubspec.lock
 
 # FVM Version Cache
 .fvm/
+
+# Example package
+example/
+example/lib/main.dart
+example/pubspec.yaml
+example/android/app/src/main/AndroidManifest.xml
+example/lib/main.dart
+example/*

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:obd2/src/functions.dart';
@@ -31,7 +30,7 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
   /// Creates a Bluetooth OBD-II adapter instance.
   ///
   /// The adapter is not connected until [connect] is called.
-  BluetoothAdapterOBD2({required super.diagnosticStandard});
+  BluetoothAdapterOBD2({required super.standard});
 
   /// Indicates whether the Bluetooth adapter is connected.
   @override

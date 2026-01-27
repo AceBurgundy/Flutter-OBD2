@@ -11,11 +11,11 @@ abstract class DiagnosticStandard {
   /// Human-readable name of the diagnostic standard.
   String get name;
 
+  /// ID for the specific diagnostic standard.
+  String get id;
+
   /// List of AT commands required to initialize the adapter.
   List<String> get initializationCommands;
-
-  /// All supported parameter identifiers for this standard.
-  List<DetailedPID> get allowedDetailedPIDs;
 
   /// Builds a request command for a given PID.
   String buildDetailedPIDRequest(DetailedPID detailedPID);

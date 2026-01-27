@@ -1,20 +1,17 @@
 import 'package:obd2/obd2.dart';
 
+import '../../standard_ids.dart';
+
 /// SAE J1979 diagnostic standard implementation.
 class SaeJ1979 extends DiagnosticStandard {
 
-  static final DetailedPIDs _detailedPIDCatalog = DetailedPIDs();
-
-  /// Namespace for SAE J1979 Parameter Identifiers.
-  ///
-  /// These PIDs are **static** and **standard-scoped**, meaning:
-  /// - They belong to SAE J1979
-  /// - They are not instance-bound
-  /// - They do not pollute the global namespace
-  DetailedPIDs get detailedPIDs => _detailedPIDCatalog;
-
   @override
   String get name => 'SAE J1979';
+
+  @override
+  String get id => DiagnosticStandardIDs.saeJ1979;
+
+  SAEJ1979ModeTelemetry telemetry = SAEJ1979ModeTelemetry();
 
   @override
   List<String> get initializationCommands => const [
@@ -22,12 +19,6 @@ class SaeJ1979 extends DiagnosticStandard {
     'AT E0',
     'AT L0',
     'AT SP 0',
-  ];
-
-  @override
-  List<DetailedPID> get allowedDetailedPIDs => [
-    detailedPIDs.rpm
-    // later: speed, coolant, throttle, etc.
   ];
 
   @override

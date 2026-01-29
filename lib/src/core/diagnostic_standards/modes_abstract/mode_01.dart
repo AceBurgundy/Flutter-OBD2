@@ -25,65 +25,83 @@ abstract class TelemetryMode {
   static String get mode => throw UnimplementedError();
 
   /// Engine speed in revolutions per minute.
-  DetailedPID get rpm;
+  DetailedPID<double> get rpm;
 
   /// Vehicle speed.
-  DetailedPID get speed;
+  DetailedPID<double> get speed;
+
+  /// Vehicle odometer.
+  DetailedPID<double> get odometer;
 
   /// Engine coolant temperature.
-  DetailedPID get coolantTemperature;
+  DetailedPID<double> get coolantTemperature;
 
   /// Intake air temperature.
-  DetailedPID get intakeAirTemperature;
+  DetailedPID<double> get intakeAirTemperature;
 
   /// Throttle position percentage.
-  DetailedPID get throttlePosition;
+  DetailedPID<double> get throttlePosition;
 
   /// Calculated engine load.
-  DetailedPID get engineLoad;
+  DetailedPID<double> get engineLoad;
 
   /// Mass air flow rate.
-  DetailedPID get massAirFlow;
+  DetailedPID<double> get massAirFlow;
 
   /// Fuel level input.
-  DetailedPID get fuelLevel;
+  DetailedPID<double> get fuelLevel;
 
   /// Intake manifold absolute pressure.
-  DetailedPID get intakeManifoldPressure;
+  DetailedPID<double> get intakeManifoldPressure;
 
   /// Ignition timing advance.
-  DetailedPID get timingAdvance;
+  DetailedPID<double> get timingAdvance;
+
+  /// Data that can be extracted for AFR.
+  DetailedPID<List<double>> get lambdaBank1Sensor1;
 
   /// Barometric pressure.
-  DetailedPID get barometricPressure;
+  DetailedPID<double> get barometricPressure;
 
   /// ECU control module voltage.
-  DetailedPID get controlModuleVoltage;
+  DetailedPID<double> get controlModuleVoltage;
 
   /// Engine oil temperature.
-  DetailedPID get oilTemperature;
+  DetailedPID<double> get oilTemperature;
 
   /// Fuel consumption rate.
-  DetailedPID get fuelRate;
+  DetailedPID<double> get fuelRate;
 
   /// Ambient air temperature.
-  DetailedPID get ambientAirTemperature;
+  DetailedPID<double> get ambientAirTemperature;
 
   /// Fuel type identifier.
-  DetailedPID get fuelType;
+  DetailedPID<String> get fuelType;
 
   /// Starts a live telemetry streaming session.
+  ///
+  /// ### Parameters:
+  /// - [detailedPIDs]: List of PIDs to poll cyclically.
+  /// - [onData]: Callback triggered when new data arrives. Values can be double, String, or List.
+  /// - [pollInterval]: Time to wait between requests (default 300ms).
+  /// - [adapter]: The connected OBD-II adapter.
+  ///
+  /// ### Returns:
+  /// - (TelemetrySession): The active session handle.
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
-    required void Function(Map<DetailedPID, double>) onData,
-    Duration pollInterval = const Duration(milliseconds: 300),
-    required AdapterOBD2 adapter
+    required void Function(TelemetryData) onData,
+    Duration pollInterval = const Duration(milliseconds: 250),
+    required AdapterOBD2 adapter,
   });
 
   /// Performs a one-time telemetry snapshot query.
-  Future<Map<DetailedPID, double>> query({
+  ///
+  /// ### Returns:
+  /// - (`Future<Map<DetailedPID, dynamic>>`): Map of PID to its value (double, String, or List).
+  Future<Map<DetailedPID, dynamic>> query({
     required List<DetailedPID> detailedPIDs,
-    required AdapterOBD2 adapter
+    required AdapterOBD2 adapter,
   });
 }
 
@@ -105,4 +123,42 @@ class TelemetrySession {
   void stop() {
     _pollingTimer.cancel();
   }
+}
+
+/// A type-safe container for telemetry data.
+///
+/// Instead of a raw Map, this class uses generics to ensure that
+/// retrieving a value matches the type defined in the PID.
+class TelemetryData {
+  /// The internal storage of values.
+  final Map<DetailedPID, dynamic> _values;
+
+  /// The timestamp of this data snapshot.
+  final DateTime timestamp;
+
+  TelemetryData(this._values, {DateTime? timestamp})
+      : timestamp = timestamp ?? DateTime.now();
+
+  /// Retrieves a type-safe value for the given PID.
+  ///
+  /// This method uses the generic type [T] from the [pid] to ensure
+  /// the return type matches the PID's definition.
+  ///
+  /// ### Parameters:
+  /// - [detailedPID] (`DetailedPID<T>`): The PID to retrieve.
+  ///
+  /// ### Returns:
+  /// - (T?): The value cast to type [T], or null if not present.
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// double? rpm = data.get(rpmPID); // OK
+  /// double? fuel = data.get(fuelStringPID); // COMPILE ERROR
+  /// ```
+  T? get<T>(DetailedPID<T> detailedPID) {
+    return _values[detailedPID] as T?;
+  }
+
+  /// Helper to check if data exists.
+  bool hasData(DetailedPID pid) => _values.containsKey(pid);
 }

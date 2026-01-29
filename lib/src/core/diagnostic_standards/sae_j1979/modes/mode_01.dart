@@ -1,13 +1,18 @@
 import 'dart:async';
 
 import 'package:obd2/src/functions.dart';
+import '../../../../enums.dart';
 import '../../../../models.dart';
 import '../../../adapter_obd2.dart';
 import '../../../standard_ids.dart';
 import '../../modes_abstract/mode_01.dart';
 
+
 /// SAE = Society of Automotive Engineers
 /// PID = Parameter Identifier
+/// ECU = Engine Control Unit
+/// AFR = Air Fuel Ratio
+/// DTC = Diagnostic Trouble Code
 ///
 /// SAE J1979 Mode 01 telemetry implementation.
 ///
@@ -24,7 +29,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   static const String mode = '01';
 
   @override
-  final DetailedPID rpm = const DetailedPID(
+  final DetailedPID<double> rpm = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010C',
     'Engine Revolutions Per Minute',
@@ -32,14 +37,15 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID speed = const DetailedPID(
+  final DetailedPID<double> speed = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010D',
     'Vehicle Speed',
     '[0]',
   );
 
-  final DetailedPID odometer = const DetailedPID(
+  @override
+  final DetailedPID<double> odometer = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '01A6',
     'Vehicle Odometer',
@@ -47,7 +53,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID coolantTemperature = const DetailedPID(
+  final DetailedPID<double> coolantTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0105',
     'Engine Coolant Temperature',
@@ -55,7 +61,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID intakeAirTemperature = const DetailedPID(
+  final DetailedPID<double> intakeAirTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010F',
     'Intake Air Temperature',
@@ -63,7 +69,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID throttlePosition = const DetailedPID(
+  final DetailedPID<double> throttlePosition = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0111',
     'Throttle Position',
@@ -71,7 +77,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID engineLoad = const DetailedPID(
+  final DetailedPID<double> engineLoad = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0104',
     'Calculated Engine Load',
@@ -79,7 +85,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID massAirFlow = const DetailedPID(
+  final DetailedPID<double> massAirFlow = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0110',
     'Mass Air Flow',
@@ -87,7 +93,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID fuelLevel = const DetailedPID(
+  final DetailedPID<double> fuelLevel = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '012F',
     'Fuel Level Input',
@@ -95,7 +101,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID intakeManifoldPressure = const DetailedPID(
+  final DetailedPID<double> intakeManifoldPressure = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010B',
     'Intake Manifold Pressure',
@@ -103,15 +109,29 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID timingAdvance = const DetailedPID(
+  final DetailedPID<double> timingAdvance = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010E',
     'Timing Advance',
     '([0] / 2) - 64',
   );
 
+  /// Lambda (Equivalence Ratio) and Voltage.
+  ///
+  /// This PID returns a composite list of two values:
+  /// - Index 0: Lambda (Equivalence Ratio)
+  /// - Index 1: Sensor Voltage
   @override
-  final DetailedPID barometricPressure = const DetailedPID(
+  final DetailedPID<List<double>> lambdaBank1Sensor1 = const DetailedPID(
+    DiagnosticStandardIDs.saeJ1979,
+    "0124",
+    "Lambda (Bank 1, Sensor 1)",
+    "(256 * A + B) / 32768",
+    obd2QueryReturnType: OBD2QueryReturnValue.composite, // Tells adapter to return List<double>
+  );
+
+  @override
+  final DetailedPID<double> barometricPressure = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0133',
     'Barometric Pressure',
@@ -119,7 +139,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID controlModuleVoltage = const DetailedPID(
+  final DetailedPID<double> controlModuleVoltage = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0142',
     'Control Module Voltage',
@@ -127,7 +147,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID oilTemperature = const DetailedPID(
+  final DetailedPID<double> oilTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '015C',
     'Engine Oil Temperature',
@@ -135,7 +155,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID fuelRate = const DetailedPID(
+  final DetailedPID<double> fuelRate = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '015E',
     'Engine Fuel Rate',
@@ -143,7 +163,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID ambientAirTemperature = const DetailedPID(
+  final DetailedPID<double> ambientAirTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0146',
     'Ambient Air Temperature',
@@ -151,23 +171,56 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   );
 
   @override
-  final DetailedPID fuelType = const DetailedPID(
+  final DetailedPID<String> fuelType = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0151',
     'Fuel Type',
     '[0]',
+    obd2QueryReturnType: OBD2QueryReturnValue.text,
   );
+
+  /// Calculates AFR (Air Fuel Ratio) from the Lambda vector.
+  ///
+  /// Expects the list returned by [lambdaBank1Sensor1] which contains
+  /// [Lambda, Voltage].
+  ///
+  /// ### Parameters:
+  /// - [lambdaData] (`List<double>`): The composite result from PID 0124.
+  /// - [fuelStoichiometricRatio] (double): The stoichiometric ratio for the fuel.
+  ///    - Gasoline: 14.7 (Default)
+  ///    - Diesel: 14.5
+  ///    - E85 Ethanol: 9.76
+  ///
+  /// ### Returns:
+  /// - (double): The calculated Air-Fuel Ratio (e.g., 14.7).
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// double afr = sae.calculateAFR(resultList);
+  /// ```
+  double calculateAFR(List<double> lambdaData, {double fuelStoichiometricRatio = 14.7}) {
+    try {
+      if (lambdaData.isEmpty) return 0.0;
+
+      // Extract Lambda from the first index of the list
+      double lambdaValue = lambdaData[0];
+
+      // Convert to AFR
+      return lambdaValue * fuelStoichiometricRatio;
+    } catch (error, stackTrace) {
+      logError(error, stackTrace, message: "Error calculating AFR from list data");
+      return 0.0;
+    }
+  }
 
   @override
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
-    required void Function(Map<DetailedPID, double>) onData,
+    required void Function(TelemetryData) onData,
     Duration pollInterval = const Duration(milliseconds: 300),
     required AdapterOBD2 adapter,
   }) {
-    if (!adapter.isConnected) {
-      throw StateError('Adapter is not connected.');
-    }
+    if (!adapter.isConnected) throw StateError('Adapter is not connected.');
 
     int index = 0;
 
@@ -178,14 +231,13 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       index = (index + 1) % detailedPIDs.length;
 
       try {
-        final double value = await adapter.queryPID(pid);
-        onData({pid: value});
+        final dynamic value = await adapter.queryPID(pid);
+
+        final dataMap = {pid: value};
+        onData(TelemetryData(dataMap));
+
       } catch (error, stackTrace) {
-        logError(
-          error,
-          stackTrace,
-          message: 'Failed to poll telemetry data from the ECU.',
-        );
+        logError(error, stackTrace, message: 'Failed to poll PID ${pid.parameterID}.');
       }
     });
 
@@ -193,21 +245,21 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   }
 
   @override
-  Future<Map<DetailedPID, double>> query({
+  Future<Map<DetailedPID, dynamic>> query({
     required List<DetailedPID> detailedPIDs,
-    required AdapterOBD2 adapter
+    required AdapterOBD2 adapter,
   }) async {
-    final Map<DetailedPID, double> results = {};
+    final Map<DetailedPID, dynamic> results = {};
 
     for (final DetailedPID pid in detailedPIDs) {
       try {
-        final double value = await adapter.queryPID(pid);
+        final dynamic value = await adapter.queryPID(pid);
         results[pid] = value;
       } catch (error, stackTrace) {
         logError(
           error,
           stackTrace,
-          message: 'Failed to query telemetry data from the ECU.',
+          message: 'Failed to query telemetry data from the ECU for PID ${pid.parameterID}.',
         );
         rethrow;
       }
@@ -216,3 +268,4 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     return results;
   }
 }
+

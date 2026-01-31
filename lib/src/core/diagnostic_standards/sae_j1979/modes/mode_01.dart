@@ -224,29 +224,57 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
-    Duration pollInterval = const Duration(milliseconds: 300),
+    int pollIntervalMs = 300,
     required AdapterOBD2 adapter,
+    bool noWarning = false,
   }) {
-    if (!adapter.isConnected) throw StateError('Adapter is not connected.');
+    if (!adapter.isConnected) {
+      throw StateError('Adapter is not connected.');
+    }
+
+    // --- Performance Warning Check ---
+    if (!noWarning) {
+      for (final DetailedPID pid in detailedPIDs) {
+        // If the PID wants to be polled slowly (e.g. 10,000ms) but we are 
+        // polling it fast (e.g. 250ms), we warn the user.
+        // We use a 2x threshold to avoid warning on small differences.
+        if (pid.bestPollingIntervalMs > (pollIntervalMs * 2)) {
+          print(
+            '⚠️ [OBD2 Performance Warning] PID "${pid.name}" is being polled every ${pollIntervalMs}ms, '
+            'but its recommended interval is ${pid.bestPollingIntervalMs}ms.\n'
+            '   Consider moving this PID to a separate, slower TelemetrySession to reduce bus load.'
+          );
+        }
+      }
+    }
 
     int index = 0;
 
-    final Timer pollingTimer = Timer.periodic(pollInterval, (_) async {
-      if (!adapter.isConnected) return;
+    final Timer pollingTimer = Timer.periodic(
+      Duration(milliseconds: pollIntervalMs), 
+      (_) async {
+        if (!adapter.isConnected) return;
 
-      final DetailedPID pid = detailedPIDs[index];
-      index = (index + 1) % detailedPIDs.length;
+        final DetailedPID pid = detailedPIDs[index];
+        
+        // Round-Robin Index Increment
+        index = (index + 1) % detailedPIDs.length;
 
-      try {
-        final dynamic value = await adapter.queryPID(pid);
+        try {
+          final dynamic value = await adapter.queryPID(pid);
 
-        final dataMap = {pid: value};
-        onData(TelemetryData(dataMap));
+          final Map<DetailedPID, dynamic> dataMap = {pid: value};
+          onData(TelemetryData(dataMap));
 
-      } catch (error, stackTrace) {
-        logError(error, stackTrace, message: 'Failed to poll PID ${pid.parameterID}.');
-      }
-    });
+        } catch (error, stackTrace) {
+          logError(
+            error,
+            stackTrace,
+            message: 'Failed to poll PID ${pid.parameterID}.',
+          );
+        }
+      },
+    );
 
     return TelemetrySession(pollingTimer);
   }

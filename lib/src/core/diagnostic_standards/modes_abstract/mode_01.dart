@@ -81,18 +81,23 @@ abstract class TelemetryMode {
   /// Starts a live telemetry streaming session.
   ///
   /// ### Parameters:
-  /// - [detailedPIDs]: List of PIDs to poll cyclically.
-  /// - [onData]: Callback triggered when new data arrives. Values can be double, String, or List.
-  /// - [pollInterval]: Time to wait between requests (default 300ms).
-  /// - [adapter]: The connected OBD-II adapter.
+  /// - [detailedPIDs] (`List<DetailedPID>`): List of PIDs to poll cyclically.
+  /// - [onData] (`Function`): Callback triggered when new data arrives.
+  /// - [pollIntervalMs] (`int`): Time in milliseconds between requests (default 300).
+  /// - [adapter] (`AdapterOBD2`): The connected OBD-II adapter.
+  /// - [noWarning] (`bool`): If true, suppresses console warnings about inefficient polling intervals (default false).
   ///
   /// ### Returns:
-  /// - (TelemetrySession): The active session handle.
+  /// - (`TelemetrySession`): The active session handle.
+  ///
+  /// ### Throws:
+  /// - (`StateError`): If adapter is not connected.
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
-    Duration pollInterval = const Duration(milliseconds: 250),
+    int pollIntervalMs = 300,
     required AdapterOBD2 adapter,
+    bool noWarning = false,
   });
 
   /// Performs a one-time telemetry snapshot query.

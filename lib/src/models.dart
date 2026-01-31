@@ -21,7 +21,7 @@ class DetailedPID<T> {
   /// - **Low Value (e.g., 20)**: High priority (RPM, Speed).
   /// - **High Value (e.g., 10000)**: Low priority (Odometer, Fuel Level).
   /// - **Null**: Use the session's default interval.
-  final int? bestPollingIntervalMs;
+  final int bestPollingIntervalMs;
 
   const DetailedPID(
     this.standard,
@@ -29,7 +29,7 @@ class DetailedPID<T> {
     this.name,
     this.formula, {
     this.obd2QueryReturnType = OBD2QueryReturnValue.double,
-    this.bestPollingIntervalMs,
+    this.bestPollingIntervalMs = 250,
   });
 
   @override

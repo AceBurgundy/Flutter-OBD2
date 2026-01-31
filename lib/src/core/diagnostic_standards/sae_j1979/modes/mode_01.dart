@@ -50,6 +50,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '01A6',
     'Vehicle Odometer',
     '([0] * 16777216 + [1] * 65536 + [2] * 256 + [3]) / 10',
+    bestPollingIntervalMs: 10000
   );
 
   @override
@@ -58,6 +59,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '0105',
     'Engine Coolant Temperature',
     '[0] - 40',
+    bestPollingIntervalMs: 5000
   );
 
   @override
@@ -66,6 +68,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '010F',
     'Intake Air Temperature',
     '[0] - 40',
+    bestPollingIntervalMs: 2000
   );
 
   @override
@@ -98,6 +101,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '012F',
     'Fuel Level Input',
     '[0] * 100 / 255',
+    bestPollingIntervalMs: 10000
   );
 
   @override
@@ -144,6 +148,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '0142',
     'Control Module Voltage',
     '([0] * 256 + [1]) / 1000',
+    bestPollingIntervalMs: 1000
   );
 
   @override
@@ -168,6 +173,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '0146',
     'Ambient Air Temperature',
     '[0] - 40',
+    bestPollingIntervalMs: 10000
   );
 
   @override
@@ -177,6 +183,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     'Fuel Type',
     '[0]',
     obd2QueryReturnType: OBD2QueryReturnValue.text,
+    bestPollingIntervalMs: 60000
   );
 
   /// Calculates AFR (Air Fuel Ratio) from the Lambda vector.

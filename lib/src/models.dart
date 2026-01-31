@@ -13,13 +13,24 @@ class DetailedPID<T> {
   final String formula;
   final OBD2QueryReturnValue obd2QueryReturnType;
 
+  /// The suggested polling interval in milliseconds.
+  ///
+  /// This integer represents the ideal delay between requests for this specific PID
+  /// to balance bus load and data freshness.
+  ///
+  /// - **Low Value (e.g., 20)**: High priority (RPM, Speed).
+  /// - **High Value (e.g., 10000)**: Low priority (Odometer, Fuel Level).
+  /// - **Null**: Use the session's default interval.
+  final int? bestPollingIntervalMs;
+
   const DetailedPID(
-      this.standard,
-      this.parameterID,
-      this.name,
-      this.formula, {
-        this.obd2QueryReturnType = OBD2QueryReturnValue.double,
-      });
+    this.standard,
+    this.parameterID,
+    this.name,
+    this.formula, {
+    this.obd2QueryReturnType = OBD2QueryReturnValue.double,
+    this.bestPollingIntervalMs,
+  });
 
   @override
   String toString() => "$name ($parameterID)";

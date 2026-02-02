@@ -224,25 +224,25 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
-    int pollIntervalMs = 300,
     required AdapterOBD2 adapter,
-    bool noWarning = false,
+    required bool removeWarnings,
+    int pollIntervalMs = 300
   }) {
     if (!adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
     // --- Performance Warning Check ---
-    if (!noWarning) {
-      for (final DetailedPID pid in detailedPIDs) {
-        // If the PID wants to be polled slowly (e.g. 10,000ms) but we are 
+    if (!removeWarnings) {
+      for (final DetailedPID detailedPID in detailedPIDs) {
+        // If the DETAILEDPID wants to be polled slowly (e.g. 10,000ms) but we are 
         // polling it fast (e.g. 250ms), we warn the user.
         // We use a 2x threshold to avoid warning on small differences.
-        if (pid.bestPollingIntervalMs > (pollIntervalMs * 2)) {
+        if (detailedPID.bestPollingIntervalMs > (pollIntervalMs * 2)) {
           print(
-            '⚠️ [OBD2 Performance Warning] PID "${pid.name}" is being polled every ${pollIntervalMs}ms, '
-            'but its recommended interval is ${pid.bestPollingIntervalMs}ms.\n'
-            '   Consider moving this PID to a separate, slower TelemetrySession to reduce bus load.'
+            '⚠️ [OBD2 Performance Warning] detailed pid with name "${detailedPID.name}" is being polled every ${pollIntervalMs}ms, '
+            'but its recommended interval is ${detailedPID.bestPollingIntervalMs}ms.\n'
+            '   Consider moving this detailed pid to a separate, slower TelemetrySession to reduce bus load.'
           );
         }
       }

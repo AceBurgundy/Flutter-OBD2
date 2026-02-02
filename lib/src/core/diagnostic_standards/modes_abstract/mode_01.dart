@@ -85,7 +85,7 @@ abstract class TelemetryMode {
   /// - [onData] (`Function`): Callback triggered when new data arrives.
   /// - [pollIntervalMs] (`int`): Time in milliseconds between requests (default 300).
   /// - [adapter] (`AdapterOBD2`): The connected OBD-II adapter.
-  /// - [noWarning] (`bool`): If true, suppresses console warnings about inefficient polling intervals (default false).
+  /// - [removeWarnings] (`bool`): If true, suppresses console warnings about inefficient polling intervals (default false).
   ///
   /// ### Returns:
   /// - (`TelemetrySession`): The active session handle.
@@ -95,9 +95,9 @@ abstract class TelemetryMode {
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
-    int pollIntervalMs = 300,
     required AdapterOBD2 adapter,
-    bool noWarning = false,
+    int pollIntervalMs = 300,
+    required bool removeWarnings,
   });
 
   /// Performs a one-time telemetry snapshot query.

@@ -78,26 +78,30 @@ abstract class TelemetryMode {
   /// Fuel type identifier.
   DetailedPID<String> get fuelType;
 
-  /// Starts a live telemetry streaming session.
+  /// Starts a smart, priority-based telemetry streaming session.
+  ///
+  /// This stream automatically manages scheduling based on the [bestPollingIntervalMs]
+  /// defined inside each [DetailedPID].
+  ///
+  /// - **High Priority PIDs** (e.g., RPM) will be queried frequently.
+  /// - **Low Priority PIDs** (e.g., Fuel Level) will be skipped until their
+  ///   interval has elapsed.
   ///
   /// ### Parameters:
-  /// - [detailedPIDs] (`List<DetailedPID>`): List of PIDs to poll cyclically.
-  /// - [onData] (`Function`): Callback triggered when new data arrives.
-  /// - [pollIntervalMs] (`int`): Time in milliseconds between requests (default 300).
-  /// - [adapter] (`AdapterOBD2`): The connected OBD-II adapter.
-  /// - [removeWarnings] (`bool`): If true, suppresses console warnings about inefficient polling intervals (default false).
+  /// - [detailedPIDs]: The list of sensors to monitor.
+  /// - [onData]: Callback triggered when new data arrives.
+  /// - [adapter]: The connected OBD-II adapter.
+  /// - [pollIntervalMs]: The **Bus Cool-down** time. The stream waits this long
+  ///   *after* a query finishes before starting the next one.
+  ///   Recommended: 10ms - 50ms.
   ///
   /// ### Returns:
-  /// - (`TelemetrySession`): The active session handle.
-  ///
-  /// ### Throws:
-  /// - (`StateError`): If adapter is not connected.
+  /// - (`TelemetrySession`): Control object to stop the stream.
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
     required AdapterOBD2 adapter,
-    int pollIntervalMs = 300,
-    required bool removeWarnings,
+    int pollIntervalMs = 10,
   });
 
   /// Performs a one-time telemetry snapshot query.
@@ -113,20 +117,19 @@ abstract class TelemetryMode {
 /// Represents an active telemetry polling session.
 ///
 /// A session manages:
-/// - Periodic ECU polling
+/// - Recursive ECU polling
 /// - Safe cancellation
-///
-/// Sessions must be explicitly stopped.
 class TelemetrySession {
-  /// Timer responsible for periodic polling.
-  final Timer _pollingTimer;
+  /// The callback function executed when [stop] is called.
+  /// This is used to flip the internal `isRunning` flag in the loop.
+  final void Function() _onStop;
 
-  /// Creates a telemetry session.
-  TelemetrySession(this._pollingTimer);
+  /// Creates a telemetry session with a cancellation callback.
+  TelemetrySession(this._onStop);
 
   /// Stops the telemetry session and releases resources.
   void stop() {
-    _pollingTimer.cancel();
+    _onStop();
   }
 }
 

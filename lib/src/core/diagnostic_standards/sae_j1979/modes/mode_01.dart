@@ -220,63 +220,121 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     }
   }
 
+  /// Starts a live telemetry streaming session using a robust recursive loop.
+  ///
+  /// This implementation uses a "wait-and-proceed" approach instead of a fixed Timer.
+  /// This ensures that if a PID times out, the next request waits patiently
+  /// instead of causing a collision.
+  ///
+  /// ### Parameters:
+  /// - [detailedPIDs]: A list of Parameter IDs to be polled.
+  /// - [onData]: A callback triggered when new telemetry data is received.
+  /// - [adapter]: The physical or virtual adapter used for communication.
+  /// - [pollIntervalMs]: The delay in milliseconds between each request.
+  ///
+  /// ### Returns:
+  /// - (TelemetrySession): An object allowing the user to control or stop the stream.
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// final session = manager.stream(
+  ///   detailedPIDs: [rpmPid, speedPid],
+  ///   onData: (data) => print(data),
+  ///   adapter: myAdapter,
+  /// );
+  /// ```
+  ///
+  /// ### Throws:
+  /// - (StateError): Thrown if the adapter is not connected when the stream starts.
   @override
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
     required AdapterOBD2 adapter,
-    required bool removeWarnings,
-    int pollIntervalMs = 300
+    int pollIntervalMs = 10,
   }) {
     if (!adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
-    // --- Performance Warning Check ---
-    if (!removeWarnings) {
-      for (final DetailedPID detailedPID in detailedPIDs) {
-        // If the DETAILEDPID wants to be polled slowly (e.g. 10,000ms) but we are 
-        // polling it fast (e.g. 250ms), we warn the user.
-        // We use a 2x threshold to avoid warning on small differences.
-        if (detailedPID.bestPollingIntervalMs > (pollIntervalMs * 2)) {
-          print(
-            '⚠️ [OBD2 Performance Warning] detailed pid with name "${detailedPID.name}" is being polled every ${pollIntervalMs}ms, '
-            'but its recommended interval is ${detailedPID.bestPollingIntervalMs}ms.\n'
-            '   Consider moving this detailed pid to a separate, slower TelemetrySession to reduce bus load.'
+    // 1. Initialize Scheduling Timestamps
+    // We track the last time (in epoch ms) each PID was successfully queried.
+    // Initializing to 0 ensures they all run immediately on the first pass.
+    final Map<DetailedPID, int> lastQueryTimestamps = {};
+    for (var pid in detailedPIDs) {
+      lastQueryTimestamps[pid] = 0;
+    }
+
+    // Loop Control Flags
+    bool isRunning = true;
+    int index = 0;
+
+    /// Recursive Smart Polling Loop
+    Future<void> startSmartLoop() async {
+      // Loop runs indefinitely until stopped or disconnected
+      while (isRunning && adapter.isConnected) {
+        final int now = DateTime.now().millisecondsSinceEpoch;
+        bool didQueryAny = false;
+
+        // We process ONE PID per loop iteration to allow async breaks.
+        final DetailedPID pid = detailedPIDs[index];
+        index = (index + 1) % detailedPIDs.length;
+
+        final int lastUpdate = lastQueryTimestamps[pid] ?? 0;
+        final int targetInterval = pid.bestPollingIntervalMs;
+
+        // Is it time to update this PID?
+        if ((now - lastUpdate) < targetInterval) {
+          // Skip
+          // The PID is not ready yet. Loop immediately to the next one.
+        } else {
+          // YES -> QUERY
+          try {
+            // Await the hardware response (Stop collision)
+            final dynamic value = await adapter.queryPID(pid);
+
+            if (isRunning) {
+              final Map<DetailedPID, dynamic> dataMap = {pid: value};
+              onData(TelemetryData(dataMap));
+
+              // Mark as updated
+              lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
+              didQueryAny = true;
+            }
+          } catch (error, stackTrace) {
+            logError(
+                error,
+                stackTrace,
+                message: 'Failed to poll PID ${pid.parameterID}.'
+            );
+            // Even on error, we mark it as "updated" to prevent retrying
+            // the broken PID 1000 times a second.
+            lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
+          }
+
+          // Rest time cuh
+          // Only rest if we actually used the bus.
+          if (isRunning) {
+            await Future.delayed(Duration(milliseconds: pollIntervalMs));
+          }
+        }
+
+        // Sleeping to save back on CPU process when we cycled back to 0
+        // and we didn't query anything in the last pass because everything is waiting.
+        if (index == 0 && !didQueryAny) {
+          await Future.delayed(
+              const Duration(milliseconds: 1)
           );
         }
       }
     }
 
-    int index = 0;
+    // Start the loop
+    startSmartLoop();
 
-    final Timer pollingTimer = Timer.periodic(
-      Duration(milliseconds: pollIntervalMs), 
-      (_) async {
-        if (!adapter.isConnected) return;
-
-        final DetailedPID pid = detailedPIDs[index];
-        
-        // Round-Robin Index Increment
-        index = (index + 1) % detailedPIDs.length;
-
-        try {
-          final dynamic value = await adapter.queryPID(pid);
-
-          final Map<DetailedPID, dynamic> dataMap = {pid: value};
-          onData(TelemetryData(dataMap));
-
-        } catch (error, stackTrace) {
-          logError(
-            error,
-            stackTrace,
-            message: 'Failed to poll PID ${pid.parameterID}.',
-          );
-        }
-      },
-    );
-
-    return TelemetrySession(pollingTimer);
+    return TelemetrySession(() {
+      isRunning = false;
+    });
   }
 
   @override

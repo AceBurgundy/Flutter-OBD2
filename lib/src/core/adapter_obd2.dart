@@ -138,34 +138,40 @@ abstract class AdapterOBD2 {
   /// - (`StateError`): If adapter is initializing.
   /// - (`TimeoutException`): If ECU does not respond.
   Future<dynamic> queryPID(DetailedPID detailedPID) async {
-    // 1. Guard Clause: Don't interrupt initialization
     if (_isInitializingAdapter) {
       throw StateError(
           "Cannot query PID ${detailedPID.name} while adapter is initializing.");
     }
 
-    final String command = standard.buildDetailedPIDRequest(
-      detailedPID,
-    );
-
+    final String command = standard.buildDetailedPIDRequest(detailedPID);
     _pendingResponseCompleter = Completer<String>();
 
     try {
       await _sendCommand(command, requestCode: 400);
 
-      final String rawResponse = await _pendingResponseCompleter!.future
-          .timeout(const Duration(seconds: 2));
+      // Wrapping the wait in a specific try-catch for Timeouts.
+      String rawResponse;
+      try {
+        rawResponse = await _pendingResponseCompleter!.future.timeout(const Duration(seconds: 2));
+      } on TimeoutException {
+        // If the ECU doesn't reply in 2s, we return null (No Data)
+        // instead of throwing an exception that breaks the loop.
+        logError(
+            Exception("Timeout"),
+            StackTrace.current,
+            message: "ECU timed out on PID ${detailedPID.parameterID} (${detailedPID.name})"
+        );
+        return null;
+      }
 
-      // 2. Handle "NO DATA" explicitly
-      if (rawResponse.contains("NO DATA") || rawResponse.contains("?")) {
-        return null; // Vehicle does not support this PID
+      if (rawResponse.contains("NO DATA") || rawResponse.contains("?") == true) {
+        return null;
       }
 
       final String cleanedResponse = rawResponse
           .replaceAll(RegExp(r'[\n\r> ]'), '')
           .replaceAll('SEARCHING...', '');
 
-      // Convert hex string to integer list
       final List<int> dataBytes = standard
           .extractDataBytes(
         response: cleanedResponse,
@@ -174,13 +180,10 @@ abstract class AdapterOBD2 {
           .map((hex) => int.parse(hex, radix: 16))
           .toList();
 
-      // 3. Handle Empty Bytes (Extraction failed)
-      if (dataBytes.isEmpty) {
-        return null;
-      }
+      if (dataBytes.isEmpty) return null;
 
-      // Switch logic based on Data Type defined in the PID
       switch (detailedPID.obd2QueryReturnType) {
+
         case OBD2QueryReturnValue.text:
           return String.fromCharCodes(dataBytes);
 
@@ -191,15 +194,14 @@ abstract class AdapterOBD2 {
           return dataBytes;
 
         case OBD2QueryReturnValue.double:
-        return _evaluateMathExpression(detailedPID, dataBytes);
+          return _evaluateMathExpression(detailedPID, dataBytes);
       }
     } catch (error, stackTrace) {
       logError(
         error,
         stackTrace,
-        message: 'Failure querying PID ${detailedPID.parameterID}. Last Cmd: $_latestCommand',
+        message: 'Failure querying PID ${detailedPID.parameterID}. Last Command: $_latestCommand',
       );
-      // We explicitly return null on error so the stream doesn't crash
       return null;
     } finally {
       _pendingResponseCompleter = null;
@@ -237,7 +239,7 @@ abstract class AdapterOBD2 {
 
       // Evaluate
       final ContextModel contextModel = ContextModel();
-      return expression.evaluate(EvaluationType.REAL, contextModel).toDouble();
+      return RealEvaluator(contextModel).evaluate(expression).toDouble();
 
     } catch (error, stackTrace) {
       logError(

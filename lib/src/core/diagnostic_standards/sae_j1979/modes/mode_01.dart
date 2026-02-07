@@ -34,6 +34,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '010C',
     'Engine Revolutions Per Minute',
     '([0] * 256 + [1]) / 4',
+    bestPollingIntervalMs: 10
   );
 
   @override
@@ -46,11 +47,11 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
 
   @override
   final DetailedPID<double> odometer = const DetailedPID(
-    DiagnosticStandardIDs.saeJ1979,
+      DiagnosticStandardIDs.saeJ1979,
     '01A6',
     'Vehicle Odometer',
     '([0] * 16777216 + [1] * 65536 + [2] * 256 + [3]) / 10',
-    bestPollingIntervalMs: 10000
+      bestPollingIntervalMs: 10000
   );
 
   @override
@@ -220,6 +221,73 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     }
   }
 
+  /// Calculates the projected odometer reading based on speed and elapsed time.
+  ///
+  /// This method uses dead-reckoning to estimate the distance traveled since the
+  /// [lastUpdateTime]. It includes a specific filter to ignore GPS "drift"
+  /// inaccuracies when the vehicle is stationary or moving very slowly (e.g., < 3 km/h).
+  ///
+  /// ### Parameters:
+  /// - (`double` currentOdometer): The last known odometer reading in kilometers.
+  /// - (`double` currentSpeedKmh): The current vehicle speed in km/h (usually from GPS).
+  /// - (`DateTime` lastUpdateTime): The timestamp when the odometer was last updated.
+  ///
+  /// ### Returns:
+  /// - (`Future<double>`): The updated odometer reading in kilometers. If permissions
+  ///   are denied or an error occurs, returns the original [currentOdometer].
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// double newOdo = await SAEJ1979ModeTelemetry.calculateOdometer(
+  ///   currentOdometer: vehicle.odometer,
+  ///   currentSpeedKmh: gpsSpeed,
+  ///   lastUpdateTime: lastTickTime,
+  /// );
+  /// ```
+  static Future<double> calculateOdometer({
+    required double currentOdometer,
+    required double currentSpeedKmh,
+    required DateTime lastUpdateTime,
+  }) async {
+    // GPS: Global Positioning System
+    // KMH: Kilometers Per Hour
+
+    // Threshold to filter out GPS drift when stopped.
+    // GPS often reports 1-3 km/h even when completely stationary.
+    const double gpsStationaryThresholdKmh = 3.0;
+
+    try {
+      // 2. Filter GPS Noise
+      // If the speed is too low, we assume the vehicle is stopped and
+      // simply return the current odometer without incrementing.
+      if (currentSpeedKmh < gpsStationaryThresholdKmh) {
+        return currentOdometer;
+      }
+
+      // 3. Calculate Time Delta
+      final DateTime now = DateTime.now();
+      final Duration timeDifference = now.difference(lastUpdateTime);
+
+      // Convert duration to hours (milliseconds / 1000 / 60 / 60)
+      final double elapsedHours = timeDifference.inMilliseconds / 3600000.0;
+
+      // 4. Calculate Distance Traveled (Distance = Speed * Time)
+      final double distanceTraveledKm = currentSpeedKmh * elapsedHours;
+
+      // 5. Return Incremented Odometer
+      return currentOdometer + distanceTraveledKm;
+
+    } catch (error, stackTrace) {
+      logError(
+        error,
+        stackTrace,
+        message: 'Failed to calculate GPS odometer.',
+      );
+      // Fallback: Return the original value to prevent data corruption
+      return currentOdometer;
+    }
+  }
+
   /// Starts a live telemetry streaming session using a robust recursive loop.
   ///
   /// This implementation uses a "wait-and-proceed" approach instead of a fixed Timer.
@@ -247,6 +315,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   /// ### Throws:
   /// - (StateError): Thrown if the adapter is not connected when the stream starts.
   @override
+  @override
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
@@ -257,80 +326,41 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       throw StateError('Adapter is not connected.');
     }
 
-    // 1. Initialize Scheduling Timestamps
-    // We track the last time (in epoch ms) each PID was successfully queried.
-    // Initializing to 0 ensures they all run immediately on the first pass.
-    final Map<DetailedPID, int> lastQueryTimestamps = {};
-    for (var pid in detailedPIDs) {
-      lastQueryTimestamps[pid] = 0;
-    }
+    final Map<DetailedPID, int> lastQueryTimestamps = {
+      for (var pid in detailedPIDs) pid: 0
+    };
 
-    // Loop Control Flags
     bool isRunning = true;
     int index = 0;
 
-    /// Recursive Smart Polling Loop
-    Future<void> startSmartLoop() async {
-      // Loop runs indefinitely until stopped or disconnected
+    Future<void> smartLoop() async {
       while (isRunning && adapter.isConnected) {
-        final int now = DateTime.now().millisecondsSinceEpoch;
-        bool didQueryAny = false;
-
-        // We process ONE PID per loop iteration to allow async breaks.
-        final DetailedPID pid = detailedPIDs[index];
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final pid = detailedPIDs[index];
         index = (index + 1) % detailedPIDs.length;
 
-        final int lastUpdate = lastQueryTimestamps[pid] ?? 0;
-        final int targetInterval = pid.bestPollingIntervalMs;
+        final lastTime = lastQueryTimestamps[pid]!;
+        final targetInterval = pid.bestPollingIntervalMs;
 
-        // Is it time to update this PID?
-        if ((now - lastUpdate) < targetInterval) {
-          // Skip
-          // The PID is not ready yet. Loop immediately to the next one.
-        } else {
-          // YES -> QUERY
+        if (now - lastTime >= targetInterval) {
           try {
-            // Await the hardware response (Stop collision)
-            final dynamic value = await adapter.queryPID(pid);
-
+            final value = await adapter.queryPID(pid);
             if (isRunning) {
-              final Map<DetailedPID, dynamic> dataMap = {pid: value};
-              onData(TelemetryData(dataMap));
-
-              // Mark as updated
-              lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
-              didQueryAny = true;
+              onData(TelemetryData({pid: value}));
+              lastQueryTimestamps[pid] =
+                  DateTime.now().millisecondsSinceEpoch;
             }
           } catch (error, stackTrace) {
-            logError(
-                error,
-                stackTrace,
-                message: 'Failed to poll PID ${pid.parameterID}.'
-            );
-            // Even on error, we mark it as "updated" to prevent retrying
-            // the broken PID 1000 times a second.
-            lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
-          }
-
-          // Rest time cuh
-          // Only rest if we actually used the bus.
-          if (isRunning) {
-            await Future.delayed(Duration(milliseconds: pollIntervalMs));
+            logError(error, stackTrace,
+                message: 'Telemetry polling error.');
           }
         }
 
-        // Sleeping to save back on CPU process when we cycled back to 0
-        // and we didn't query anything in the last pass because everything is waiting.
-        if (index == 0 && !didQueryAny) {
-          await Future.delayed(
-              const Duration(milliseconds: 1)
-          );
-        }
+        await Future.delayed(Duration(milliseconds: pollIntervalMs));
       }
     }
 
-    // Start the loop
-    startSmartLoop();
+    smartLoop();
 
     return TelemetrySession(() {
       isRunning = false;

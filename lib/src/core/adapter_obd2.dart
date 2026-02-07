@@ -1,108 +1,89 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:math_expressions/math_expressions.dart';
 import '../../obd2.dart';
 
-/// AT = Attention Command (ELM327 adapter control command)
+/// AT = Attention Command (Standard modem control prefix used by ELM327)
 /// ECU = Engine Control Unit
 /// PID = Parameter Identifier
-/// BLE = Bluetooth Low Energy
+/// ASCII = American Standard Code for Information Interchange
 
 /// Defines the OBD-II request category used when communicating with the ECU.
-///
-/// Each mode maps to a standardized OBD-II service.
 enum OBDMode {
-  /// Requests **current powertrain diagnostic data** (Mode 01).
-  ///
-  /// Examples:
-  /// - Engine RPM
-  /// - Vehicle speed
-  /// - Coolant temperature
+  /// Requests current powertrain diagnostic data (Mode 01).
   currentPowertrainData,
-
-  /// Requests **static vehicle information** (Mode 09).
-  ///
-  /// Examples:
-  /// - Vehicle Identification Number (VIN)
-  /// - ECU calibration identifiers
+  /// Requests static vehicle information (Mode 09).
   vehicleInformation,
 }
 
 /// Low-level communication interface and **OBD-II engine**.
 ///
-/// This class:
-/// - Sends commands to the ECU
-/// - Waits for responses
-/// - Parses telemetry values
-///
-/// Subclasses handle **transport mechanics** (BLE, USB, etc.).
-/// This class handles **protocol semantics**.
+/// This abstract class handles the core logic of communicating with an
+/// ELM327-compatible adapter. It manages the command queue, parses
+/// raw ASCII responses, handles protocol initialization, and evaluates
+/// mathematical formulas for PIDs.
 abstract class AdapterOBD2 {
-  /// Indicates whether the adapter is currently connected.
+  /// Indicates whether the transport layer (Bluetooth/WiFi) is currently connected.
   bool get isConnected;
 
-  /// Stream of raw ASCII bytes received from the adapter.
+  /// A stream of raw bytes received from the physical adapter.
   Stream<List<int>> get incomingData;
 
-  /// Writes raw ASCII-encoded bytes to the adapter.
+  /// Writes raw bytes to the physical adapter.
+  ///
+  /// ### Parameters:
+  /// - [data] (List<int>): The list of bytes (usually ASCII encoded) to send.
   Future<void> write(List<int> data);
 
-  /// Disconnects the adapter and releases all resources.
+  /// Disconnects the adapter and releases all transport resources.
   Future<void> disconnect();
 
-  /// Diagnostic standard used to build commands and parse responses.
+  /// The diagnostic standard (e.g., SAE J1979) used to format commands and parse results.
   final DiagnosticStandard standard;
 
-  /// Cached parsed math expressions per PID for performance.
-  final Map<String, Expression> _expressionCache = {};
-
-  /// Indicates whether adapter initialization is currently running.
-  ///
-  /// Used to block new PID queries while the adapter is resetting.
+  /// A flag indicating if the adapter is currently running its initialization sequence.
   bool _isInitializingAdapter = false;
 
-  /// Last command sent to the ECU.
-  ///
+  /// The last command string sent to the ECU.
   /// Used for debugging context when a timeout or error occurs.
   String _latestCommand = '';
 
-  /// Numeric identifier describing the last request type.
-  ///
-  /// - 100: Initialization Command
-  /// - 400: PID Data Request
+  /// A numeric code classifying the type of the last request.
+  /// - 100: Initialization Command (AT commands)
+  /// - 400: PID Data Request (Mode 01/09 commands)
   int _requestCode = 0;
 
-  /// Internal response buffer for assembling ECU replies.
+  /// The internal buffer used to accumulate fragmented response data.
   String _responseBuffer = '';
 
-  /// Completer waiting for the current ECU response.
+  /// A completer used to signal the completion of a pending command.
   Completer<String>? _pendingResponseCompleter;
 
-  AdapterOBD2({required this.standard});
-
-  /// Initializes the diagnostic adapter using AT commands.
+  /// Creates a new adapter instance.
   ///
-  /// This method is automatically called after a successful connection.
+  /// Automatically subscribes to the [incomingData] stream to handle responses.
+  AdapterOBD2({required this.standard}) {
+    // CRITICAL: Wire the stream here in the base class.
+    // This ensures data is processed regardless of the transport implementation.
+    incomingData.listen(_handleIncomingData);
+  }
+
+  /// Initializes the diagnostic adapter using standard AT commands.
   ///
   /// ### Throws:
-  /// - (`StateError`): If the adapter is not connected.
-  /// - (`Exception`): If initialization fails.
+  /// - (StateError): If the adapter is not connected.
   Future<void> initializeAdapter() async {
-    if (!isConnected) {
-      throw StateError('Adapter is not connected.');
-    }
+    if (!isConnected) throw StateError('Adapter is not connected.');
 
     _isInitializingAdapter = true;
 
     try {
-      // Standard initialization sequence
       // 1. AT Z (Reset)
-      // 2. AT E0 (Echo Off)
-      // 3. AT L0 (Linefeeds Off)
-      // 4. AT SP0 (Auto Protocol)
+      await _sendCommand("ATZ", requestCode: 100);
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // 2. Setup (Echo Off, Linefeeds Off, Auto Protocol)
       final List<String> initializationCommands = [
-        "ATZ",
         "ATE0",
         "ATL0",
         "ATSP0"
@@ -110,210 +91,146 @@ abstract class AdapterOBD2 {
 
       for (final String command in initializationCommands) {
         await _sendCommand(command, requestCode: 100);
-        await Future.delayed(const Duration(milliseconds: 200));
+        await Future.delayed(const Duration(milliseconds: 250));
       }
     } catch (error, stackTrace) {
-      logError(
-        error,
-        stackTrace,
-        message: 'Failed to initialize OBD-II adapter. Last command: $_latestCommand',
-      );
+      logError(error, stackTrace, message: 'Failed to initialize OBD-II adapter.');
       rethrow;
     } finally {
       _isInitializingAdapter = false;
     }
   }
 
-  /// Sends a PID request and waits for its ECU response.
-  ///
-  /// The return type depends on [detailedPID.returnType].
+  /// Sends a PID request to the ECU and waits for the response.
   ///
   /// ### Parameters:
-  /// - (`DetailedPID`): PID to query.
+  /// - [detailedPID] (DetailedPID): The parameter to query.
   ///
   /// ### Returns:
-  /// - (`dynamic?`): Parsed data (Double, String, or Map). **Returns null** if vehicle has no data.
-  ///
-  /// ### Throws:
-  /// - (`StateError`): If adapter is initializing.
-  /// - (`TimeoutException`): If ECU does not respond.
+  /// - (dynamic): The parsed value (double, String, or List). Returns `null` on failure.
   Future<dynamic> queryPID(DetailedPID detailedPID) async {
     if (_isInitializingAdapter) {
-      throw StateError(
-          "Cannot query PID ${detailedPID.name} while adapter is initializing.");
+      throw StateError("Cannot query while adapter is initializing.");
     }
 
     final String command = standard.buildDetailedPIDRequest(detailedPID);
+
+    // Cancel any hanging requests
+    if (_pendingResponseCompleter != null && !_pendingResponseCompleter!.isCompleted) {
+      _pendingResponseCompleter!.completeError(Exception("Interrupted by new query"));
+    }
+
     _pendingResponseCompleter = Completer<String>();
+    _responseBuffer = ''; // Clear buffer for fresh data
 
     try {
       await _sendCommand(command, requestCode: 400);
 
-      // Wrapping the wait in a specific try-catch for Timeouts.
       String rawResponse;
       try {
-        rawResponse = await _pendingResponseCompleter!.future.timeout(const Duration(seconds: 2));
-      } on TimeoutException {
-        // If the ECU doesn't reply in 2s, we return null (No Data)
-        // instead of throwing an exception that breaks the loop.
-        logError(
-            Exception("Timeout"),
-            StackTrace.current,
-            message: "ECU timed out on PID ${detailedPID.parameterID} (${detailedPID.name})"
+        // Wait for response (Timeout set to 5s for slower ECUs)
+        rawResponse = await _pendingResponseCompleter!.future.timeout(
+            const Duration(seconds: 5)
         );
+      } on TimeoutException {
+        // Don't crash, just return null so the stream can retry
+        logError(Exception("Timeout"), StackTrace.current,
+            message: "ECU timed out on PID ${detailedPID.name}");
         return null;
       }
 
-      if (rawResponse.contains("NO DATA") || rawResponse.contains("?") == true) {
+      if (rawResponse.contains("NO DATA") || rawResponse.contains("?")) {
         return null;
       }
 
-      final String cleanedResponse = rawResponse
-          .replaceAll(RegExp(r'[\n\r> ]'), '')
-          .replaceAll('SEARCHING...', '');
+      // Use the standard to extract relevant bytes
+      final List<String> hexList = standard.extractDataBytes(
+          response: rawResponse,
+          detailedPID: detailedPID
+      );
 
-      final List<int> dataBytes = standard
-          .extractDataBytes(
-        response: cleanedResponse,
-        detailedPID: detailedPID,
-      )
-          .map((hex) => int.parse(hex, radix: 16))
-          .toList();
+      if (hexList.isEmpty) return null;
 
-      if (dataBytes.isEmpty) return null;
+      final List<int> dataBytes = hexList.map((hex) => int.parse(hex, radix: 16)).toList();
 
       switch (detailedPID.obd2QueryReturnType) {
-
         case OBD2QueryReturnValue.text:
           return String.fromCharCodes(dataBytes);
-
         case OBD2QueryReturnValue.composite:
           return _parseCompositePID(detailedPID, dataBytes);
-
         case OBD2QueryReturnValue.status:
           return dataBytes;
-
         case OBD2QueryReturnValue.double:
           return _evaluateMathExpression(detailedPID, dataBytes);
       }
     } catch (error, stackTrace) {
-      logError(
-        error,
-        stackTrace,
-        message: 'Failure querying PID ${detailedPID.parameterID}. Last Command: $_latestCommand',
-      );
+      logError(error, stackTrace, message: 'Failure querying PID ${detailedPID.name}.');
       return null;
     } finally {
       _pendingResponseCompleter = null;
     }
   }
 
-  /// Evaluates standard numeric PIDs using the math expression engine.
+  /// Evaluates the mathematical formula for a PID.
   ///
-  /// ### Parameters:
-  /// - (`DetailedPID`): The PID containing the formula.
-  /// - (`List<int>`): The raw data bytes from the ECU.
-  ///
-  /// ### Returns:
-  /// - (`double?`): The physical value, or **null** if evaluation fails.
+  /// **Note:** This method creates a fresh expression every time to avoid
+  /// caching stale values when the byte data changes.
   double? _evaluateMathExpression(DetailedPID detailedPID, List<int> dataBytes) {
     try {
       String formula = detailedPID.formula;
 
-      // Replace placeholders [0], [1] with actual byte values
+      // Inject byte values into the formula
       for (int index = 0; index < dataBytes.length; index++) {
-        formula = formula.replaceAll(
-          '[$index]',
-          dataBytes[index].toString(),
-        );
+        formula = formula.replaceAll('[$index]', dataBytes[index].toString());
       }
 
-      // Check Cache
-      Expression? expression = _expressionCache[detailedPID.parameterID];
-
-      // Parse if not cached
-      if (expression == null) {
-        expression = GrammarParser().parse(formula);
-        _expressionCache[detailedPID.parameterID] = expression;
-      }
-
-      // Evaluate
+      final Expression expression = GrammarParser().parse(formula);
       final ContextModel contextModel = ContextModel();
-      return RealEvaluator(contextModel).evaluate(expression).toDouble();
+      return RealEvaluator(ContextModel()).evaluate(expression).toDouble();
 
     } catch (error, stackTrace) {
-      logError(
-          error,
-          stackTrace,
-          message: "Math evaluation failed for ${detailedPID.parameterID}"
-      );
+      logError(error, stackTrace, message: "Math evaluation failed for ${detailedPID.name}");
       return null;
     }
   }
 
-  /// Handles special composite PIDs that return multiple values.
-  ///
-  /// ### Parameters:
-  /// - (`DetailedPID`): The PID definition.
-  /// - (`List<int>`): The raw bytes.
-  ///
-  /// ### Returns:
-  /// - (`List<double>?`): A list of values, or null if bytes are insufficient.
-  List<double>? _parseCompositePID(DetailedPID pid, List<int> bytes) {
-    // Specific logic for Wideband O2 (PID 0124)
-    if (pid.parameterID == "0124" && bytes.length >= 4) {
-      // Byte A, B = Lambda
-      double lambda = (256.0 * bytes[0] + bytes[1]) / 32768.0;
-
-      // Byte C, D = Voltage
-      double voltage = (256.0 * bytes[2] + bytes[3]) / 8192.0;
-
-      return [lambda, voltage];
+  /// Parses special composite PIDs (like Wideband O2).
+  List<double>? _parseCompositePID(DetailedPID detailedPID, List<int> bytes) {
+    if (detailedPID.parameterID == "0124" && bytes.length >= 4) {
+      return [
+        (256.0 * bytes[0] + bytes[1]) / 32768.0,
+        (256.0 * bytes[2] + bytes[3]) / 8192.0
+      ];
     }
-
     return null;
   }
 
   /// Sends a raw command to the adapter.
-  ///
-  /// ### Parameters:
-  /// - (`String`): Command string.
-  /// - (`int`): Request classification code (100=Init, 400=Query).
   Future<void> _sendCommand(String command, {required int requestCode}) async {
-    if (!isConnected) {
-      throw StateError('Adapter is not connected.');
-    }
-
+    if (!isConnected) throw StateError('Adapter is not connected.');
     try {
       _latestCommand = command;
       _requestCode = requestCode;
-
-      // Append Carriage Return (\r) as required by ELM327 protocol
+      // Append Carriage Return (\r) as per ELM327 spec
       await write(utf8.encode('$command\r'));
     } catch (error, stackTrace) {
-      logError(
-        error,
-        stackTrace,
-        message: 'Failed to send command: $_latestCommand',
-      );
+      logError(error, stackTrace, message: 'Failed to send command: $_latestCommand');
       rethrow;
     }
   }
 
-  /// Internal hook to be called by transport implementations
-  /// when new raw data arrives from the adapter.
-  ///
-  /// ### Parameters:
-  /// - (`List<int>`): Raw bytes received from the socket/bluetooth stream.
-  void handleIncomingData(List<int> data) {
-    _responseBuffer += utf8.decode(data);
+  /// Internal handler for incoming data stream.
+  void _handleIncomingData(List<int> data) {
+    // Decode with allowMalformed to handle noisy cheap adapters
+    final String newText = utf8.decode(data, allowMalformed: true);
+    _responseBuffer += newText;
 
-    // ELM327 ends responses with the '>' character prompt.
-    if (_responseBuffer.contains('>') &&
-        _pendingResponseCompleter != null &&
-        !_pendingResponseCompleter!.isCompleted) {
-      _pendingResponseCompleter!.complete(_responseBuffer);
-      _responseBuffer = '';
+    // Check for the ELM327 prompt character '>'.
+    // This indicates the device is done sending data and is waiting for a command.
+    if (_responseBuffer.contains('>')) {
+      if (_pendingResponseCompleter != null && !_pendingResponseCompleter!.isCompleted) {
+        _pendingResponseCompleter!.complete(_responseBuffer);
+      }
     }
   }
 }

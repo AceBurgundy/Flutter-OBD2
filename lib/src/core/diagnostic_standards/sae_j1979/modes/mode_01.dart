@@ -244,7 +244,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   ///   lastUpdateTime: lastTickTime,
   /// );
   /// ```
-  static Future<double> calculateOdometer({
+  Future<double> calculateOdometer({
     required double currentOdometer,
     required double currentSpeedKmh,
     required DateTime lastUpdateTime,

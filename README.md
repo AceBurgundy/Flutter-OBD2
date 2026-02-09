@@ -4,22 +4,20 @@ A **modern, diagnostic-standard–aware OBD-II SDK for Flutter**, designed for *
 
 This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and focuses on:
 
-* 🚀 Simple, session-based telemetry polling
-* 🧠 Diagnostic-standard–scoped PID definitions
-* 🧩 Pluggable transport adapters (Bluetooth today, more later)
-* ⚡ High-performance formula evaluation with caching
-* 🧼 Clean architecture with minimal abstraction overhead
+* 🚀 Simple, session-based telemetry polling.
+* 🧠 Diagnostic-standard–scoped PID definitions.
+* 🧩 Pluggable transport adapters (Bluetooth today, more later).
+* ⚡ Type-safe value handling (Generic `DetailedPID<T>`).
+* 🧼 Clean architecture with minimal abstraction overhead.
 
 ## ✨ Key Features
 
-* ✅ Bluetooth Low Energy (BLE) OBD-II adapters
-* ✅ Live telemetry polling (RPM, coolant temp, etc.)
-* ✅ Diagnostic standard abstraction (SAE J1979 today)
-* ✅ **Standard-scoped & Mode-aware PID definitions**
-* ✅ Cached math expression evaluation
-* ✅ Adapter auto-initialization (AT command pipeline)
-* ✅ Simple `double` telemetry values (no unnecessary wrappers)
-* ✅ Dashboard-friendly, Flutter-native API
+* ✅ **BLE Support:** Optimized for Bluetooth Low Energy adapters (via `flutter_blue_plus`).
+* ✅ **Live Streaming:** Smart, priority-based polling loop with "Bus Cool-down" management.
+* ✅ **Diagnostic Standards:** Explicit support for **SAE J1979** (Modes 01, 02, 03, 04).
+* ✅ **Type Safety:** Generic PIDs return specific types (`double`, `String`, `List<double>`) without manual casting.
+* ✅ **Formula Engine:** Built-in math expression evaluator for complex ECU responses.
+* ✅ **Fault Management:** Read and clear Diagnostic Trouble Codes (DTCs).
 
 ## 📦 Installation
 
@@ -31,211 +29,117 @@ dependencies:
 
 ```
 
-Then run:
-
-```bash
-flutter pub get
-
-```
-
-## 🔌 Supported Adapters
-
-* ELM327 BLE adapters
-* OBDLink BLE
-* Most BLE-based OBD-II scanners
-
-> ⚠️ Classic Bluetooth (SPP) adapters are **not supported**.
-
 ## 🧠 Architecture Overview
 
-The SDK follows a **clear and intentional responsibility split**:
+The SDK follows a strict hierarchy of responsibility to ensure the core logic is decoupled from the hardware transport layer.
 
 ```
-BluetoothAdapterOBD2
+BluetoothAdapterOBD2 (Transport Layer)
         ↓
-  DiagnosticStandard (SAE J1979)
+  DiagnosticStandard (Protocol: SAE J1979)
         ↓
-      Modes (Telemetry, Identity, etc.)
+    Service Modes (01 - Telemetry, 03 - Codes, etc.)
         ↓
-      DetailedPID (ID + description + formula)
+    DetailedPID<T> (Metadata + Formula)
         ↓
-        double
+     Parsed Value (double, String, or List)
 
 ```
 
 ### Core Principles
 
-* The **adapter** owns the OBD-II engine and polling loop.
-* The **diagnostic standard** defines:
-* Supported PIDs (organized by **Modes**).
-* How requests are built.
-* How ECU responses are parsed.
-
-
-* **PIDs are scoped to their diagnostic standard and specific mode.**
-* Telemetry values are returned as **plain `double**`.
-
-No global PID maps.
-
-No magic strings.
-
-No unnecessary telemetry subclasses.
-
-## 🧩 Diagnostic Standards
-
-Diagnostic standards are **explicit and injectable**.
-
-### Currently Supported
-
-* ✅ **SAE J1979** (OBD-II Modes 01, 02, 09)
-
-### Planned
-
-* ⏳ ISO 15765 (CAN)
-* ⏳ ISO 9141
-* ⏳ ISO 14230 (KWP2000)
+* **The Adapter** owns the physical connection and the AT command pipeline.
+* **The Diagnostic Standard** defines how to build requests and extract bytes.
+* **The Mode** organizes PIDs and high-level actions (like streaming or clearing codes).
+* **DetailedPIDs** are generic; `DetailedPID<double>` ensures you get a number, while `DetailedPID<String>` returns text.
 
 ## 🚀 Quick Start
 
-### 1️⃣ Connect to an OBD-II Adapter
+### 1️⃣ Initialize the Adapter
+
+Connect to a BLE device and let the adapter handle the ELM327 `AT` initialization sequence automatically.
 
 ```dart
-await FlutterBluePlus.adapterState.first;
-
-final devices = await FlutterBluePlus.bondedDevices;
-final device = devices.first;
-
 final SaeJ1979 standard = SaeJ1979();
 
-final scanner = BluetoothAdapterOBD2(
+final adapter = BluetoothAdapterOBD2(
   diagnosticStandard: standard,
 );
 
-await scanner.connect(device); // auto-initializes adapter
+// Connect and auto-initialize (ATZ, ATE0, etc.)
+await adapter.connect(myBluetoothDevice); 
 
 ```
 
-### 2️⃣ Start a Telemetry Polling Session
+### 2️⃣ Start a Live Telemetry Session
 
-Access the specific mode you need (e.g., `telemetry` for Mode 01) to keep your code clean:
+Access Mode 01 (`telemetry`) to start a priority-aware stream. The stream respects the `bestPollingIntervalMs` defined for each PID (e.g., RPM updates faster than Fuel Level).
 
 ```dart
-// Extract the mode for cleaner access
-final telemetry = standard.modes.telemetry;
+final telemetry = standard.telemetry;
 
-final session = scanner.poll(
+final session = telemetry.stream(
+  adapter: adapter,
   detailedPIDs: [
     telemetry.rpm,
     telemetry.coolantTemperature,
   ],
-  onData: (data) {
-    final rpm = data[telemetry.rpm];
-    final temp = data[telemetry.coolantTemperature];
+  onData: (TelemetryData data) {
+    // Type-safe access using the PID object
+    final double? rpm = data.get(telemetry.rpm);
+    final double? temp = data.get(telemetry.coolantTemperature);
     
-    if (rpm != null) print('RPM: $rpm');
-    if (temp != null) print('Temp: $temp');
+    print("RPM: $rpm, Temp: $temp");
   },
 );
 
-```
-
-Stop the session when done:
-
-```dart
+// Stop polling when done
 session.stop();
 
 ```
 
-## 📊 Telemetry Model
+## 📊 Diagnostic Capabilities
 
-Telemetry values are returned as **plain `double**`.
+### ⚡ Mode 01: Live Telemetry
+
+Standard sensors like RPM, Speed, Odometer, and calculated values like AFR.
+
+### ❄️ Mode 02: Freeze Frames
+
+Retrieve a snapshot of sensor data captured at the moment a fault occurred.
+
+### 🛠️ Mode 03 & 04: Trouble Codes
+
+Read confirmed DTCs and clear the Check Engine Light (MIL).
 
 ```dart
-Map<DetailedPID, double>
+// Read Codes
+final codes = await SAEJ1979ReadCodesMode().getDiagnosticTroubleCodes(adapter);
+print("Active Faults: $codes"); // ["P0300", "P0101"]
+
+// Clear Codes
+bool success = await SAEJ1979ClearCodesMode().clearDiagnosticTroubleCodes(adapter);
 
 ```
 
-Each `DetailedPID` contains:
+## 🧩 PID Scoping & Types
 
-* Parameter ID (e.g. `010C`)
-* Human-readable description
-* Formula used to compute the value
+Gone are the days of global maps or magic strings. PIDs are scoped to their standard and return specific types based on the `OBD2QueryReturnValue` enum.
 
-## 🧠 PID Scoping (Important)
-
-PIDs are **scoped to their diagnostic standard and organized by mode**. This structure prevents "namespace pollution" and ensures you are requesting the correct data for the correct mode.
-
-```dart
-final modes = standard.modes;
-
-// Mode 01: Live Telemetry
-modes.telemetry.rpm
-
-// Mode 09: Vehicle Identity
-modes.identity.vin
-
-// Mode 02: Freeze Frame (Snapshot)
-modes.snapshots.rpm
-
-```
-
-No global `rpm`.
-
-No guessing which mode a PID belongs to.
+| Return Type | Usage Example | Result |
+| --- | --- | --- |
+| `double` | `telemetry.rpm` | `750.0` |
+| `String` | `telemetry.fuelType` | `"Gasoline"` |
+| `List<double>` | `telemetry.lambdaBank1Sensor1` | `[0.98, 0.45]` |
+| `status` | `DTC Requests` | `[0x43, 0x01, ...]` |
 
 ## ⚡ Performance Optimizations
 
-* 🧠 Cached parsed math expressions per PID
-* 🧮 One-time formula compilation
-* 🔁 ECU-synchronized polling loop
-* 🚫 No repeated parsing or reflection
-
-## 🔮 Roadmap
-
-* 🚧 Diagnostic Trouble Codes (DTCs)
-* 🚧 Clear fault codes
-* 🚧 Additional diagnostic standards
-* 🚧 Expanded telemetry coverage
-* 🚧 Protocol auto-detection
-* 🚧 Multi-PID batching optimizations
-
-## 🧪 API Status
-
-* 🚀 Actively developed
-* 🧪 API stabilizing
-* 🧱 Designed for long-term extensibility
-
-Breaking changes will be documented clearly.
+* **Greedy BLE Subscription:** Subscribes to all notifying characteristics to find the data pipe instantly.
+* **Write Without Response:** Uses BLE's fastest write mode where supported.
+* **Math Caching:** Formulas are parsed into expression trees for high-frequency evaluation.
+* **Bus Cool-down:** Configurable `pollIntervalMs` prevents overwhelming the vehicle's CAN bus.
 
 ## 📄 License
 
-Licensed under the **Mozilla Public License 2.0 (MPL-2.0)**.
-
-* ✔ Commercial use allowed
-* ✔ Modification allowed
-* ✔ Binary distribution allowed
-
-You must:
-
-* Share modifications to MPL-licensed files
-
-🔗 [https://www.mozilla.org/en-US/MPL/2.0/](https://www.mozilla.org/en-US/MPL/2.0/)
-
-## 🤝 Contributing
-
-Contributions are welcome:
-
-* Bug reports
-* New diagnostic standards
-* Additional PID definitions
-* Documentation improvements
-
-Open an issue or submit a pull request.
-
-## ⭐ Support the Project
-
-If this project helped you:
-
-* ⭐ Star the repo
-* 🐛 Report issues
-* 💡 Share ideas
+Licensed under the **Mozilla Public License 2.0 (MPL-2.0)**. You are free to use this commercially, provided you share modifications made to the library files themselves.

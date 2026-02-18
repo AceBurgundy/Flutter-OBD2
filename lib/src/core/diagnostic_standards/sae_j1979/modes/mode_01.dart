@@ -187,6 +187,28 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 60000
   );
 
+  /// Contains a list of all supported PIDs.
+  List<DetailedPID<dynamic>> get allDetailedPID => [
+    rpm,
+    speed,
+    odometer,
+    coolantTemperature,
+    intakeAirTemperature,
+    throttlePosition,
+    engineLoad,
+    massAirFlow,
+    fuelLevel,
+    intakeManifoldPressure,
+    timingAdvance,
+    lambdaBank1Sensor1,
+    barometricPressure,
+    controlModuleVoltage,
+    oilTemperature,
+    fuelRate,
+    ambientAirTemperature,
+    fuelType
+  ];
+
   /// Calculates AFR (Air Fuel Ratio) from the Lambda vector.
   ///
   /// Expects the list returned by [lambdaBank1Sensor1] which contains
@@ -215,8 +237,8 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
 
       // Convert to AFR
       return lambdaValue * fuelStoichiometricRatio;
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: "Error calculating AFR from list data");
+    } catch (error, stack) {
+      logError(error, stack, message: "Error calculating AFR from list data");
       return 0.0;
     }
   }
@@ -277,14 +299,131 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       // 5. Return Incremented Odometer
       return currentOdometer + distanceTraveledKm;
 
-    } catch (error, stackTrace) {
+    } catch (error, stack) {
       logError(
         error,
-        stackTrace,
+        stack,
         message: 'Failed to calculate GPS odometer.',
       );
       // Fallback: Return the original value to prevent data corruption
       return currentOdometer;
+    }
+  }
+
+  /// Detects supported Mode 01 telemetry PIDs using a hybrid strategy.
+  ///
+  /// This method first queries the SAE J1979 capability bitmasks
+  /// (0100, 0120, 0140) to determine which PIDs are theoretically supported
+  /// by the ECU. It then optionally validates real-world accessibility
+  /// by actively querying each supported PID.
+  ///
+  /// ### Parameters:
+  /// - [adapter] (AdapterOBD2): A connected and initialized adapter.
+  /// - [validateAccessibility] (bool): If `true`, each PID is actively queried
+  ///   to ensure it responds with valid data. Defaults to `false`.
+  ///
+  /// ### Returns:
+  /// - (`Future<List<String>>`): A list of supported PID parameter IDs
+  ///   (e.g., `["010C", "010D", "012F"]`).
+  ///
+  /// ### Notes:
+  /// - Bitmask detection is fast and standards-based.
+  /// - Accessibility validation is slower but guarantees real usability.
+  /// - Manufacturer-restricted PIDs may appear in bitmask results but fail validation.
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// final supportedPIDs = await sae.detectSupportedTelemetry(
+  ///   adapter: adapter,
+  ///   validateAccessibility: true,
+  /// );
+  /// ```
+  Future<List<String>> detectSupportedTelemetry({ required AdapterOBD2 adapter, bool validateAccessibility = false }) async {
+    if (!adapter.isConnected) {
+      throw StateError('Adapter is not connected.');
+    }
+
+    final List<String> supportedParameterIDs = [];
+
+    /// SAE J1979 capability discovery PIDs
+    final List<DetailedPID> capabilityPIDs = [
+      const DetailedPID(
+        DiagnosticStandardIDs.saeJ1979,
+        '0100',
+        'Supported PIDs 01–20',
+        '',
+        obd2QueryReturnType: OBD2QueryReturnValue.status,
+      ),
+      const DetailedPID(
+        DiagnosticStandardIDs.saeJ1979,
+        '0120',
+        'Supported PIDs 21–40',
+        '',
+        obd2QueryReturnType: OBD2QueryReturnValue.status,
+      ),
+      const DetailedPID(
+        DiagnosticStandardIDs.saeJ1979,
+        '0140',
+        'Supported PIDs 41–60',
+        '',
+        obd2QueryReturnType: OBD2QueryReturnValue.status,
+      ),
+    ];
+
+    try {
+      // Bitmask Discovery
+      // Checks for all accessible pids including manufacturer-restricted ones
+      for (final DetailedPID capabilityPID in capabilityPIDs) {
+        final List<int>? bitmask = await adapter.queryPID(capabilityPID) as List<int>?;
+        if (bitmask == null || bitmask.length < 4) continue;
+
+        final int basePID = int.parse(capabilityPID.parameterID.substring(2), radix: 16);
+
+        for (int byteIndex = 0; byteIndex < 4; byteIndex++) {
+          for (int bitIndex = 0; bitIndex < 8; bitIndex++) {
+            final bool supported = (bitmask[byteIndex] & (1 << (7 - bitIndex))) != 0;
+
+            if (!supported) continue;
+
+            final int pidOffset = (byteIndex * 8) + bitIndex + 1;
+            final int supportedPIDValue = basePID + pidOffset;
+
+            final String supportedPID = '01${supportedPIDValue.toRadixString(16).padLeft(2, '0').toUpperCase()}';
+
+            final bool isImplemented = allDetailedPID.any(
+              (DetailedPID detailedPID) => detailedPID.parameterID == supportedPID,
+            );
+
+            if (isImplemented && !supportedParameterIDs.contains(supportedPID) == true) {
+              supportedParameterIDs.add(supportedPID);
+            }
+          }
+        }
+      }
+
+      // Optional Accessibility Check
+      if (validateAccessibility) {
+        final List<String> validatedParameterIDs = [];
+
+        for (final DetailedPID detailedPID in allDetailedPID) {
+          if (!supportedParameterIDs.contains(detailedPID.parameterID) == true) continue;
+
+          try {
+            final dynamic value = await adapter.queryPID(detailedPID);
+            if (value != null) validatedParameterIDs.add(detailedPID.parameterID);
+          } catch (error, stack) {
+            logError(error, stack, message: 'Accessibility validation failed for PID ${detailedPID.parameterID}.');
+          }
+        }
+
+        return validatedParameterIDs;
+      }
+
+      return supportedParameterIDs;
+
+    } catch (error, stack) {
+      logError( error, stack, message: 'Hybrid telemetry detection failed.');
+      return [];
     }
   }
 
@@ -347,12 +486,10 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
             final value = await adapter.queryPID(pid);
             if (isRunning) {
               onData(TelemetryData({pid: value}));
-              lastQueryTimestamps[pid] =
-                  DateTime.now().millisecondsSinceEpoch;
+              lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
             }
-          } catch (error, stackTrace) {
-            logError(error, stackTrace,
-                message: 'Telemetry polling error.');
+          } catch (error, stack) {
+            logError(error, stack, message: 'Telemetry polling error.');
           }
         }
 
@@ -367,6 +504,56 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     });
   }
 
+  /// Maps a list of raw PID strings to their corresponding [DetailedPID] objects.
+  ///
+  /// This utility is used to convert simple identifiers (e.g., "010C") into
+  /// full metadata objects required by the [stream] or [query] methods.
+  ///
+  /// ### Parameters:
+  /// - [pIDList] (`List<String>`): A list of hex strings representing PIDs.
+  ///
+  /// ### Returns:
+  /// - (`List<DetailedPID>`): A list of matching [DetailedPID] instances
+  ///   found in [allDetailedPID].
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// final pids = sae.getDetailedPIDsFromPIDList(["010C", "010D"]);
+  /// ```
+  List<DetailedPID> getDetailedPIDsFromPIDList(List<String> pIDList) {
+    final List<DetailedPID> detailedPIDs = [];
+
+    for (final String pid in pIDList) {
+      // Find the first object where the parameterID matches the current pid
+      final match = allDetailedPID.firstWhere(
+        (detail) => detail.parameterID == pid,
+        orElse: () => null as dynamic,
+      );
+
+      if (match != null) {
+        detailedPIDs.add(match);
+      }
+    }
+
+    return detailedPIDs;
+  }
+
+  /// Executes a one-time sequential query for a specific set of PIDs.
+  ///
+  /// Unlike [stream], this method performs a single pass through the
+  /// provided list and returns a mapped result of the current values.
+  ///
+  /// ### Parameters:
+  /// - [detailedPIDs]: The list of [DetailedPID] objects to fetch.
+  /// - [adapter]: The active [AdapterOBD2] connection.
+  ///
+  /// ### Returns:
+  /// - (`Future<Map<DetailedPID, dynamic>>`): A map where keys are the
+  ///   requested PIDs and values are the decoded responses from the ECU.
+  ///
+  /// ### Throws:
+  /// - [Exception]: Rethrows any communication errors encountered
+  ///   during the query process.
   @override
   Future<Map<DetailedPID, dynamic>> query({
     required List<DetailedPID> detailedPIDs,
@@ -378,10 +565,10 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       try {
         final dynamic value = await adapter.queryPID(pid);
         results[pid] = value;
-      } catch (error, stackTrace) {
+      } catch (error, stack) {
         logError(
           error,
-          stackTrace,
+          stack,
           message: 'Failed to query telemetry data from the ECU for PID ${pid.parameterID}.',
         );
         rethrow;

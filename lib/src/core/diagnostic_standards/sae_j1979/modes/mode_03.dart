@@ -1,4 +1,3 @@
-
 import 'package:obd2/src/core/diagnostic_standards/modes_abstract/mode_03.dart';
 import 'package:obd2/src/core/standard_ids.dart';
 import 'package:obd2/src/core/adapter_obd2.dart';
@@ -6,11 +5,31 @@ import 'package:obd2/obd2.dart';
 
 /// SAE J1979 Implementation of Read Codes Mode.
 class SAEJ1979ReadCodesMode extends ReadCodesMode {
+
   SAEJ1979ReadCodesMode();
 
   /// The standard command to request stored codes.
   static const String _commandReadStored = "03";
 
+  /// Retrieves the list of Diagnostic Trouble Codes (DTCs) from the vehicle.
+  ///
+  /// This method checks the adapter connection, sends the standard Mode 03 request,
+  /// and interprets the raw byte response into human-readable DTC strings.
+  ///
+  /// ### Parameters:
+  /// - (`AdapterOBD2`): adapter - The connected OBD2 adapter instance.
+  ///
+  /// ### Returns:
+  /// - (`Future<List<String>>`): A list of formatted DTC strings (e.g., "P0300"). Returns an empty list if no codes are found or if an error occurs.
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// final codes = await mode03.getDiagnosticTroubleCodes(adapter);
+  /// print(codes); // ['P0100', 'P0200']
+  /// ```
+  ///
+  /// ### Throws:
+  /// - (`StateError`): If the adapter is not connected.
   @override
   Future<List<String>> getDiagnosticTroubleCodes(AdapterOBD2 adapter) async {
     if (!adapter.isConnected) {
@@ -21,7 +40,7 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
       // We create a temporary "dummy" PID to utilize the existing query infrastructure
       // or we can manually send the command if the adapter exposes a raw send method.
       // Assuming we can send a custom PID request:
-      final DetailedPID<List<int>> requestDetailedPID = const DetailedPID(
+      final DetailedPID requestDetailedPID = const DetailedPID(
         DiagnosticStandardIDs.saeJ1979,
         _commandReadStored,
         'Read Stored DTCs',
@@ -35,15 +54,10 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
       if (rawResponse is List<int>) {
         return _decodeDTCs(rawResponse);
       }
-      
-      return [];
 
-    } catch (error, stackTrace) {
-      logError(
-        error,
-        stackTrace,
-        message: 'Failed to read diagnostic trouble codes.',
-      );
+      return [];
+    } catch (error) {
+      // If reading DTCs fails, return an empty list to indicate no codes found
       return [];
     }
   }
@@ -51,10 +65,10 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
   /// Decodes raw bytes into a list of DTC strings.
   ///
   /// ### Parameters:
-  /// - [responseBytes] (`List<int>`): Raw data from ECU.
+  /// - (`List<int>`): responseBytes - Raw data bytes received from the ECU.
   ///
   /// ### Returns:
-  /// - (`List<String>`): Formatted codes.
+  /// - (`List<String>`): A list of formatted DTC codes.
   List<String> _decodeDTCs(List<int> responseBytes) {
     final List<String> codes = [];
     try {
@@ -70,13 +84,22 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
 
         codes.add(_parseSingleDTC(byteA, byteB));
       }
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: "Error decoding DTC list bytes");
+    } catch (error) {
+      // If decoding fails partway, return what we have so far
+      return codes;
     }
+
     return codes;
   }
 
   /// Converts 2 raw bytes into standard OBD-II format (e.g. P0300).
+  ///
+  /// ### Parameters:
+  /// - (`int`): byteA - The first byte of the 2-byte DTC.
+  /// - (`int`): byteB - The second byte of the 2-byte DTC.
+  ///
+  /// ### Returns:
+  /// - (`String`): The fully formatted DTC string (e.g., "P0300", "U1000").
   String _parseSingleDTC(int byteA, int byteB) {
     try {
       // 1. Determine Prefix (Bits 7-6 of Byte A)
@@ -84,11 +107,24 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
       String prefix;
 
       switch (typeBits) {
-        case 0: prefix = "P"; break; // Powertrain
-        case 1: prefix = "C"; break; // Chassis
-        case 2: prefix = "B"; break; // Body
-        case 3: prefix = "U"; break; // Network
-        default: prefix = "P";
+        case 0:
+          prefix = "P";
+          break; // Powertrain
+
+        case 1:
+          prefix = "C";
+          break; // Chassis
+
+        case 2:
+          prefix = "B";
+          break; // Body
+
+        case 3:
+          prefix = "U";
+          break; // Network
+
+        default:
+          prefix = "P";
       }
 
       // 2. Determine Second Digit (Bits 5-4 of Byte A)
@@ -98,11 +134,11 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
       final String thirdDigit = (byteA & 0x0F).toRadixString(16).toUpperCase();
 
       // 4. Last Two Digits (Byte B)
-      final String lastTwoDigits = byteB.toRadixString(16).toUpperCase().padLeft(2, '0');
+      final String lastTwoDigits =
+      byteB.toRadixString(16).toUpperCase().padLeft(2, '0');
 
       return "$prefix$secondDigit$thirdDigit$lastTwoDigits";
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: "Error parsing single DTC: $byteA, $byteB");
+    } catch (error) {
       return "UNKNOWN";
     }
   }

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:obd2/src/functions.dart';
 import '../../../../enums.dart';
 import '../../../../models.dart';
 import '../../../adapter_obd2.dart';
@@ -237,8 +236,8 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
 
       // Convert to AFR
       return lambdaValue * fuelStoichiometricRatio;
-    } catch (error, stack) {
-      logError(error, stack, message: "Error calculating AFR from list data");
+    } catch (error) {
+      // If an error occurs (e.g. invalid data), simply return 0.0
       return 0.0;
     }
   }
@@ -299,12 +298,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       // 5. Return Incremented Odometer
       return currentOdometer + distanceTraveledKm;
 
-    } catch (error, stack) {
-      logError(
-        error,
-        stack,
-        message: 'Failed to calculate GPS odometer.',
-      );
+    } catch (error) {
       // Fallback: Return the original value to prevent data corruption
       return currentOdometer;
     }
@@ -338,7 +332,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   ///   validateAccessibility: true,
   /// );
   /// ```
-  Future<List<String>> detectSupportedTelemetry({ required AdapterOBD2 adapter, bool validateAccessibility = false }) async {
+  Future<List<String>> detectSupportedTelemetry({  required AdapterOBD2 adapter,  bool validateAccessibility = false }) async {
     if (!adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
@@ -391,10 +385,10 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
             final String supportedPID = '01${supportedPIDValue.toRadixString(16).padLeft(2, '0').toUpperCase()}';
 
             final bool isImplemented = allDetailedPID.any(
-              (DetailedPID detailedPID) => detailedPID.parameterID == supportedPID,
+                  (DetailedPID detailedPID) => detailedPID.parameterID == supportedPID,
             );
 
-            if (isImplemented && !supportedParameterIDs.contains(supportedPID) == true) {
+            if (isImplemented && !supportedParameterIDs.contains(supportedPID)) {
               supportedParameterIDs.add(supportedPID);
             }
           }
@@ -406,13 +400,13 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
         final List<String> validatedParameterIDs = [];
 
         for (final DetailedPID detailedPID in allDetailedPID) {
-          if (!supportedParameterIDs.contains(detailedPID.parameterID) == true) continue;
+          if (!supportedParameterIDs.contains(detailedPID.parameterID)) continue;
 
           try {
             final dynamic value = await adapter.queryPID(detailedPID);
             if (value != null) validatedParameterIDs.add(detailedPID.parameterID);
-          } catch (error, stack) {
-            logError(error, stack, message: 'Accessibility validation failed for PID ${detailedPID.parameterID}.');
+          } catch (error) {
+            // If validation fails for a specific PID, ignore it and continue
           }
         }
 
@@ -420,9 +414,8 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       }
 
       return supportedParameterIDs;
-
-    } catch (error, stack) {
-      logError( error, stack, message: 'Hybrid telemetry detection failed.');
+    } catch (error) {
+      // If the entire discovery process crashes, return an empty list
       return [];
     }
   }
@@ -454,7 +447,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   /// ### Throws:
   /// - (StateError): Thrown if the adapter is not connected when the stream starts.
   @override
-  @override
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
@@ -475,6 +467,9 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     Future<void> smartLoop() async {
       while (isRunning && adapter.isConnected) {
         final now = DateTime.now().millisecondsSinceEpoch;
+        // Safety check: ensure the index is within bounds if the list changes (though unexpected here)
+        if (detailedPIDs.isEmpty) break;
+
         final pid = detailedPIDs[index];
         index = (index + 1) % detailedPIDs.length;
 
@@ -488,8 +483,8 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
               onData(TelemetryData({pid: value}));
               lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
             }
-          } catch (error, stack) {
-            logError(error, stack, message: 'Telemetry polling error.');
+          } catch (error) {
+            // Ignore individual polling errors to keep the stream alive
           }
         }
 
@@ -530,9 +525,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
         orElse: () => null as dynamic,
       );
 
-      if (match != null) {
-        detailedPIDs.add(match);
-      }
+      detailedPIDs.add(match);
     }
 
     return detailedPIDs;
@@ -562,17 +555,9 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     final Map<DetailedPID, dynamic> results = {};
 
     for (final DetailedPID pid in detailedPIDs) {
-      try {
-        final dynamic value = await adapter.queryPID(pid);
-        results[pid] = value;
-      } catch (error, stack) {
-        logError(
-          error,
-          stack,
-          message: 'Failed to query telemetry data from the ECU for PID ${pid.parameterID}.',
-        );
-        rethrow;
-      }
+      // We allow errors to propagate naturally to the caller
+      final dynamic value = await adapter.queryPID(pid);
+      results[pid] = value;
     }
 
     return results;

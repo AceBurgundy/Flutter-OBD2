@@ -41,7 +41,7 @@ class SaeJ1979 extends DiagnosticStandard {
   /// - [detailedPID] (DetailedPID): The PID that was requested.
   ///
   /// ### Returns:
-  /// - (List<String>): A list of hex strings (e.g. `['1A', 'F8']`). Returns empty if parsing fails.
+  /// - (`List<String>`): A list of hex strings (e.g. `['1A', 'F8']`). Returns empty if parsing fails.
   @override
   List<String> extractDataBytes({
     required String response,
@@ -86,8 +86,8 @@ class SaeJ1979 extends DiagnosticStandard {
       }
 
       return bytes;
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: 'SAE J1979 frame parsing failed for ${detailedPID.name}.');
+    } catch (error) {
+      // Parsing failed, return empty list to indicate no valid data found
       return [];
     }
   }

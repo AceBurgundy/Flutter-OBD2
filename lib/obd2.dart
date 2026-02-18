@@ -7,7 +7,6 @@ export 'src/core/diagnostic_standards/standard_abstract.dart';
 export 'src/core/diagnostic_standards/modes_abstract/mode_01.dart' show TelemetrySession;
 export 'src/core/diagnostic_standards/modes_abstract/mode_01.dart' show TelemetryData;
 export 'src/conversions.dart';
-export 'src/functions.dart';
 export 'src/models.dart';
 export 'src/enums.dart';
 

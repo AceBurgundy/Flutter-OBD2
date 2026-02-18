@@ -1,8 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:obd2/src/functions.dart';
-import 'package:obd2/src/core/diagnostic_standards/standard_abstract.dart';
 import '../adapter_obd2.dart';
 
 /// BLE = Bluetooth Low Energy
@@ -35,8 +33,7 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
   ///
   /// ### Parameters:
   /// - [standard] (DiagnosticStandard): The protocol standard (e.g., SAE J1979).
-  BluetoothAdapterOBD2({required DiagnosticStandard standard})
-      : super(standard: standard);
+  BluetoothAdapterOBD2({required super.standard});
 
   /// Indicates whether the device is physically connected.
   @override
@@ -81,12 +78,14 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
       // 4. Greedy Discovery Loop
       // We iterate over ALL services and characteristics.
       for (final BluetoothService service in services) {
-        for (final BluetoothCharacteristic characteristic in service.characteristics) {
+        for (final BluetoothCharacteristic characteristic
+        in service.characteristics) {
           final String uuid = characteristic.uuid.toString().toLowerCase();
 
           // A. Identify Write Characteristic
           // We prioritize standard OBD UUIDs (FFF2, FFE1) if found.
-          if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+          if (characteristic.properties.write ||
+              characteristic.properties.writeWithoutResponse) {
             // If we haven't found a writer yet, take this one.
             _writeCharacteristic ??= characteristic;
 
@@ -99,8 +98,8 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
           // B. Subscribe to Notifications (THE PIPE)
           // We subscribe to ANYTHING that supports Notify or Indicate.
           // This ensures we catch the data no matter which service the adapter uses.
-          if (characteristic.properties.notify || characteristic.properties.indicate) {
-
+          if (characteristic.properties.notify ||
+              characteristic.properties.indicate) {
             if (!characteristic.isNotifying) {
               await characteristic.setNotifyValue(true);
             }
@@ -126,9 +125,8 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
 
       // 5. Initialize Adapter (AT commands)
       await initializeAdapter();
-
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: 'Connection failed.');
+    } catch (error) {
+      // Ensure we clean up resources if connection fails, then propagate the error
       await disconnect();
       rethrow;
     }
@@ -140,52 +138,42 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
   /// if it should wait for a response (Write Request) or not (Write Command).
   ///
   /// ### Parameters:
-  /// - [data] (List<int>): The ASCII bytes to send.
+  /// - [data] (`List<int>`): The ASCII bytes to send.
   @override
   Future<void> write(List<int> data) async {
     if (_writeCharacteristic == null || _connectedDevice == null) {
       throw StateError('Bluetooth adapter is not connected.');
     }
 
-    try {
-      // Use "Write Without Response" if the characteristic supports it.
-      // This is significantly faster for OBD-II streaming.
-      final bool canWriteNoResponse =
-          _writeCharacteristic!.properties.writeWithoutResponse;
+    // Use "Write Without Response" if the characteristic supports it.
+    // This is significantly faster for OBD-II streaming.
+    final bool canWriteNoResponse = _writeCharacteristic!.properties.writeWithoutResponse;
 
-      await _writeCharacteristic!.write(
-          data,
-          withoutResponse: canWriteNoResponse
-      );
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: 'Write failed.');
-      rethrow;
-    }
+    await _writeCharacteristic!.write(
+      data,
+      withoutResponse: canWriteNoResponse,
+    );
   }
 
   /// Disconnects from the device and cleans up all listeners.
   @override
   Future<void> disconnect() async {
-    try {
-      // Cancel connection listener
-      await _connectionStateSubscription?.cancel();
-      _connectionStateSubscription = null;
+    // Cancel connection listener
+    await _connectionStateSubscription?.cancel();
+    _connectionStateSubscription = null;
 
-      // Cancel ALL notification subscriptions
-      for (final StreamSubscription subscription in _notificationSubscriptions) {
-        await subscription.cancel();
-      }
-      _notificationSubscriptions.clear();
-
-      // Disconnect physical device
-      if (_connectedDevice != null) {
-        await _connectedDevice!.disconnect();
-      }
-
-      _connectedDevice = null;
-      _writeCharacteristic = null;
-    } catch (error, stackTrace) {
-      logError(error, stackTrace, message: 'Disconnect failed.');
+    // Cancel ALL notification subscriptions
+    for (final StreamSubscription subscription in _notificationSubscriptions) {
+      await subscription.cancel();
     }
+    _notificationSubscriptions.clear();
+
+    // Disconnect physical device
+    if (_connectedDevice != null) {
+      await _connectedDevice!.disconnect();
+    }
+
+    _connectedDevice = null;
+    _writeCharacteristic = null;
   }
 }

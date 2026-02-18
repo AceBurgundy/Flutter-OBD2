@@ -132,7 +132,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     "0124",
     "Lambda (Bank 1, Sensor 1)",
     "(256 * A + B) / 32768",
-    obd2QueryReturnType: OBD2QueryReturnValue.composite, // Tells adapter to return List<double>
+    obd2QueryReturnType: OBD2QueryReturnValue.composite,
   );
 
   @override

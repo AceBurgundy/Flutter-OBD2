@@ -1,145 +1,198 @@
-# 🚗 Flutter-OBD2 - A Modern Flutter OBD-II SDK
+# 🚗 Flutter-OBD2
 
-A **modern, diagnostic-standard–aware OBD-II SDK for Flutter**, designed for **live telemetry streaming**, **clean APIs**, and **long-term extensibility**.
+A **modern, diagnostic-standard–aware OBD-II SDK for Flutter**.
 
-This package works with **ELM327-compatible Bluetooth Low Energy (BLE) OBD-II adapters** and focuses on:
+This package provides a robust, type-safe interface for communicating with **ELM327-compatible Bluetooth Low Energy (BLE)** adapters. It creates a clear separation between the **Transport Layer** (Bluetooth), the **Diagnostic Standard** (SAE J1979), and the **Service Modes** (Telemetry, DTCs, Freeze Frames).
 
-* 🚀 Simple, session-based telemetry polling.
-* 🧠 Diagnostic-standard–scoped PID definitions.
-* 🧩 Pluggable transport adapters (Bluetooth today, more later).
-* ⚡ Type-safe value handling (Generic `DetailedPID<T>`).
-* 🧼 Clean architecture with minimal abstraction overhead.
+## ⚠️ Testing Status
+
+> **Current Stability:** > ✅ **Mode 01 (Live Telemetry):** Fully tested and production-ready.
+> 🚧 **Modes 02, 03, & 04:** Implemented according to SAE J1979 specifications but **have not yet been fully validated on physical vehicles**. Please use these modes with caution and report any issues on the tracker. Further testing is planned for upcoming releases.
 
 ## ✨ Key Features
 
-* ✅ **BLE Support:** Optimized for Bluetooth Low Energy adapters (via `flutter_blue_plus`).
-* ✅ **Live Streaming:** Smart, priority-based polling loop with "Bus Cool-down" management.
-* ✅ **Diagnostic Standards:** Explicit support for **SAE J1979** (Modes 01, 02, 03, 04).
-* ✅ **Type Safety:** Generic PIDs return specific types (`double`, `String`, `List<double>`) without manual casting.
-* ✅ **Formula Engine:** Built-in math expression evaluator for complex ECU responses.
-* ✅ **Fault Management:** Read and clear Diagnostic Trouble Codes (DTCs).
+**🔌 Greedy BLE Connection:** Implements a "greedy" discovery strategy that subscribes to *all* notifying characteristics to ensure a connection, regardless of the specific service UUIDs used by cheap adapters.
 
-## 📦 Installation
+**🏎️ SAE J1979 Standard:** Full support for the standard protocol used by most petrol/gasoline vehicles.
 
-Add to your `pubspec.yaml`:
+**📡 Smart Telemetry Streaming:** A recursive "wait-and-proceed" polling loop that respects the specific refresh rate (`bestPollingIntervalMs`) of each PID.
+
+**🧬 Type-Safe PIDs:** Uses `DetailedPID<T>` to return `double`, `String`, or `List<double>` automatically—no manual casting required.
+
+**🧮 Math Engine:** Integrated `math_expressions` parser to evaluate complex ECU formulas dynamically.
+
+**📍 Odometer Estimation:** Built-in logic to calculate distance traveled using speed + time, with GPS drift filtering.
+
+## 📦 Architecture
+
+The SDK is built on a layered architecture to ensure extensibility.
+
+1. 
+**AdapterOBD2 (Abstract):** Handles the command queue, ASCII decoding, and formula evaluation.
+
+2. 
+**BluetoothAdapterOBD2 (Implementation):** Manages physical BLE connections using `flutter_blue_plus`.
+
+3. 
+**DiagnosticStandard (SAE J1979):** Defines how to format commands and parse bytes for a specific protocol.
+
+4. 
+**Service Modes:** Groups logic by function (e.g., `SAEJ1979ModeTelemetry`, `SAEJ1979ReadCodesMode`).
+
+## 🚀 Getting Started
+
+### 1. Installation
+
+Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
   obd2: ^1.0.0
+  flutter_blue_plus: ^1.30.0 # Required for the Bluetooth Adapter
 
 ```
 
-## 🧠 Architecture Overview
+### 2. Initialization
 
-The SDK follows a strict hierarchy of responsibility to ensure the core logic is decoupled from the hardware transport layer.
-
-```
-BluetoothAdapterOBD2 (Transport Layer)
-        ↓
-  DiagnosticStandard (Protocol: SAE J1979)
-        ↓
-    Service Modes (01 - Telemetry, 03 - Codes, etc.)
-        ↓
-    DetailedPID<T> (Metadata + Formula)
-        ↓
-     Parsed Value (double, String, or List)
-
-```
-
-### Core Principles
-
-* **The Adapter** owns the physical connection and the AT command pipeline.
-* **The Diagnostic Standard** defines how to build requests and extract bytes.
-* **The Mode** organizes PIDs and high-level actions (like streaming or clearing codes).
-* **DetailedPIDs** are generic; `DetailedPID<double>` ensures you get a number, while `DetailedPID<String>` returns text.
-
-## 🚀 Quick Start
-
-### 1️⃣ Initialize the Adapter
-
-Connect to a BLE device and let the adapter handle the ELM327 `AT` initialization sequence automatically.
+Instantiate the standard and the adapter. The adapter handles the ELM327 initialization sequence (`AT Z`, `AT E0`, etc.) automatically upon connection.
 
 ```dart
+import 'package:obd2/obd2.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
+// 1. Create the Standard (SAE J1979)
 final SaeJ1979 standard = SaeJ1979();
 
-final adapter = BluetoothAdapterOBD2(
-  diagnosticStandard: standard,
-);
+// 2. Create the Adapter
+final adapter = BluetoothAdapterOBD2(standard: standard);
 
-// Connect and auto-initialize (ATZ, ATE0, etc.)
-await adapter.connect(myBluetoothDevice); 
+// 3. Connect to a BLE Device
+// The adapter will automatically negotiate the protocol
+await adapter.connect(myBluetoothDevice);
 
 ```
 
-### 2️⃣ Start a Live Telemetry Session
+### 3. Mode 01: Live Telemetry Streaming (Tested)
 
-Access Mode 01 (`telemetry`) to start a priority-aware stream. The stream respects the `bestPollingIntervalMs` defined for each PID (e.g., RPM updates faster than Fuel Level).
+Use the `telemetry` property on the standard to stream data. The stream is intelligent: high-priority PIDs (like RPM) are polled faster than low-priority PIDs (like Fuel Level).
 
 ```dart
+// Access Mode 01
 final telemetry = standard.telemetry;
 
+// Start Streaming
 final session = telemetry.stream(
   adapter: adapter,
   detailedPIDs: [
-    telemetry.rpm,
-    telemetry.coolantTemperature,
+    telemetry.rpm,                  // Updates fast (~10ms)
+    telemetry.speed,
+    telemetry.coolantTemperature,   // Updates slow (~5000ms)
   ],
   onData: (TelemetryData data) {
-    // Type-safe access using the PID object
-    final double? rpm = data.get(telemetry.rpm);
-    final double? temp = data.get(telemetry.coolantTemperature);
-    
-    print("RPM: $rpm, Temp: $temp");
+    // values are Type-Safe!
+    if (data.hasData(telemetry.rpm)) {
+      double rpm = data.get(telemetry.rpm)!; 
+      print("RPM: $rpm");
+    }
   },
 );
 
-// Stop polling when done
+// ... later
 session.stop();
 
 ```
 
-## 📊 Diagnostic Capabilities
+### 4. Experimental Modes (02, 03, 04)
 
-### ⚡ Mode 01: Live Telemetry
+The following modes are available for use but are currently pending extensive physical testing.
 
-Standard sensors like RPM, Speed, Odometer, and calculated values like AFR.
+#### Mode 03 & 04: Diagnostic Trouble Codes (DTCs)
 
-### ❄️ Mode 02: Freeze Frames
-
-Retrieve a snapshot of sensor data captured at the moment a fault occurred.
-
-### 🛠️ Mode 03 & 04: Trouble Codes
-
-Read confirmed DTCs and clear the Check Engine Light (MIL).
+Read and clear "Check Engine" light codes.
 
 ```dart
-// Read Codes
-final codes = await SAEJ1979ReadCodesMode().getDiagnosticTroubleCodes(adapter);
-print("Active Faults: $codes"); // ["P0300", "P0101"]
+// Mode 03: Read Codes
+final mode03 = SAEJ1979ReadCodesMode();
+final List<String> codes = await mode03.getDiagnosticTroubleCodes(adapter);
 
-// Clear Codes
-bool success = await SAEJ1979ClearCodesMode().clearDiagnosticTroubleCodes(adapter);
+print("Faults found: $codes"); // e.g. ["P0300", "P0101"]
+
+// Mode 04: Clear Codes (Resets MIL)
+final mode04 = SAEJ1979ClearCodesMode();
+bool success = await mode04.clearDiagnosticTroubleCodes(adapter);
 
 ```
 
-## 🧩 PID Scoping & Types
+#### Mode 02: Freeze Frames
 
-Gone are the days of global maps or magic strings. PIDs are scoped to their standard and return specific types based on the `OBD2QueryReturnValue` enum.
+Capture a snapshot of vehicle sensor data at the exact moment a trouble code was triggered.
 
-| Return Type | Usage Example | Result |
+```dart
+final mode02 = SAEJ1979FreezeFrameMode();
+
+final TelemetryData snapshot = await mode02.getFreezeFrameData(
+  detailedPIDs: [mode02.rpm, mode02.coolantTemperature],
+  adapter: adapter,
+);
+
+```
+
+## 🧠 Advanced Features
+
+### 🔍 Supported PID Discovery
+
+Vehicles don't support every sensor. Use `detectSupportedTelemetry` to query the ECU's bitmask and find out exactly what is available.
+
+```dart
+List<String> supportedIds = await standard.detectSupportedTelemetry(
+  adapter: adapter,
+  validateAccessibility: true, // Actually queries each PID to confirm
+);
+print("Supported PIDs: $supportedIds"); // ["010C", "010D", ...]
+
+```
+
+### 📏 Odometer Calculation
+
+Many vehicles do not expose the Odometer via standard OBD2. This package includes a utility to calculate distance based on speed over time, filtering out GPS drift when stationary.
+
+```dart
+double newOdometer = await standard.telemetry.calculateOdometer(
+  currentOdometer: 50000.0,
+  currentSpeedKmh: currentSpeed, // from GPS or OBD2
+  lastUpdateTime: previousTimestamp,
+);
+
+```
+
+## 📊 Supported PIDs (Mode 01)
+
+The `SAEJ1979ModeTelemetry` class includes strongly-typed definitions for common PIDs:
+
+| PID Name | Accessor | Return Type |
 | --- | --- | --- |
-| `double` | `telemetry.rpm` | `750.0` |
-| `String` | `telemetry.fuelType` | `"Gasoline"` |
-| `List<double>` | `telemetry.lambdaBank1Sensor1` | `[0.98, 0.45]` |
-| `status` | `DTC Requests` | `[0x43, 0x01, ...]` |
+| **Engine RPM** | `telemetry.rpm` | `double` |
+| **Vehicle Speed** | `telemetry.speed` | `double` |
+| **Coolant Temp** | `telemetry.coolantTemperature` | `double` |
+| **Engine Load** | `telemetry.engineLoad` | `double` |
+| **Fuel Level** | `telemetry.fuelLevel` | `double` |
+| **Mass Air Flow** | `telemetry.massAirFlow` | `double` |
+| **Odometer** | `telemetry.odometer` | `double` |
+| **Lambda (O2)** | `telemetry.lambdaBank1Sensor1` | `List<double>` |
+| **Fuel Type** | `telemetry.fuelType` | `String` |
+| **VIN / Text** | *Generic* | `String` |
 
-## ⚡ Performance Optimizations
+## 🛠️ Handling Connection Issues
 
-* **Greedy BLE Subscription:** Subscribes to all notifying characteristics to find the data pipe instantly.
-* **Write Without Response:** Uses BLE's fastest write mode where supported.
-* **Math Caching:** Formulas are parsed into expression trees for high-frequency evaluation.
-* **Bus Cool-down:** Configurable `pollIntervalMs` prevents overwhelming the vehicle's CAN bus.
+The `BluetoothAdapterOBD2` uses a **Greedy Discovery** approach:
+
+1. It connects to the device.
+2. It iterates through *every* service and characteristic.
+3. It explicitly looks for standard writers (`FFF2`, `FFE1`) but falls back to *any* writable characteristic if standard ones aren't found.
+4. It subscribes to *all* notifying characteristics.
+
+This ensures compatibility with cheap "clone" ELM327 adapters that often use random UUIDs.
 
 ## 📄 License
 
-Licensed under the **Mozilla Public License 2.0 (MPL-2.0)**. You are free to use this commercially, provided you share modifications made to the library files themselves.
+This project is licensed under the **Mozilla Public License 2.0**.

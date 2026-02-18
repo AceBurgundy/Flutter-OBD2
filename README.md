@@ -27,17 +27,13 @@ This package provides a robust, type-safe interface for communicating with **ELM
 
 The SDK is built on a layered architecture to ensure extensibility.
 
-1. 
-**AdapterOBD2 (Abstract):** Handles the command queue, ASCII decoding, and formula evaluation.
+1. **AdapterOBD2 (Abstract):** Handles the command queue, ASCII decoding, and formula evaluation.
 
-2. 
-**BluetoothAdapterOBD2 (Implementation):** Manages physical BLE connections using `flutter_blue_plus`.
+2. **BluetoothAdapterOBD2 (Implementation):** Manages physical BLE connections using `flutter_blue_plus`.
 
-3. 
-**DiagnosticStandard (SAE J1979):** Defines how to format commands and parse bytes for a specific protocol.
+3. **DiagnosticStandard (SAE J1979):** Defines how to format commands and parse bytes for a specific protocol.
 
-4. 
-**Service Modes:** Groups logic by function (e.g., `SAEJ1979ModeTelemetry`, `SAEJ1979ReadCodesMode`).
+4. **Service Modes:** Groups logic by function (e.g., `SAEJ1979ModeTelemetry` ,`SAEJ1979ReadCodesMode`).
 
 ## 🚀 Getting Started
 

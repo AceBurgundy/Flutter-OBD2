@@ -1,21 +1,8 @@
 import 'dart:async';
-
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:obd2/obd2.dart';
-
 import 'functions.dart';
-
-/// BLE: Bluetooth Low Energy
-/// OBD: On-Board Diagnostics
-/// RPM: Revolutions Per Minute
-/// TPS: Throttle Position Sensor
-/// CEL: Calculated Engine Load
-/// IAT: Intake Air Temperature
-/// TA: Timing Advance
-/// DTC: Diagnostic Trouble Codes
-/// ECU: Engine Control Unit
-/// PID: Parameter Identification
 
 /// A state management class that handles OBD-II data streaming and Bluetooth connectivity.
 class TelemetryProvider extends ChangeNotifier {
@@ -31,37 +18,40 @@ class TelemetryProvider extends ChangeNotifier {
   /// The logic handler for Society of Automotive Engineers (SAE) J1979 standards.
   final SaeJ1979 _saeJ1979 = SaeJ1979();
 
+  /// A timer used to throttle UI updates to prevent main-thread jank.
+  Timer? _uiUpdateTimer;
+
+  /// A flag indicating if new data has arrived since the last UI rebuild.
+  bool _needsUpdate = false;
+
   /// Indicates if the application is currently streaming data from the OBD-II adapter.
   bool isStreaming = false;
 
   /// Indicates if a Bluetooth connection attempt is currently in progress.
   bool isConnecting = false;
 
-  /// Current Engine Revolutions Per Minute.
+  /// Revolutions Per Minute: Current engine crank speed.
   double? engineRpm;
 
-  /// Current vehicle speed retrieved via OBD-II.
+  /// Vehicle Speed: Current ground speed of the vehicle.
   double? vehicleSpeed;
 
-  /// Current engine coolant temperature in Celsius.
+  /// Coolant Temp: Current engine coolant temperature in Celsius.
   double? coolantTemperature;
 
-  /// Current throttle position percentage (0-100%).
+  /// Throttle Position Sensor: Current throttle opening percentage (0-100%).
   double? throttlePosition;
 
-  /// The engine load percentage.
+  /// Calculated Engine Load: The percentage of peak available torque being used.
   double? engineLoad;
 
-  /// The ignition timing advance relative to Top Dead Center (TDC).
+  /// Timing Advance: The ignition timing relative to Top Dead Center (TDC).
   double? timingAdvance;
 
-  /// Initializes the provider by loading vehicle data from Hive storage.
+  /// Initializes the provider and prepares data structures.
   ///
   /// ### Returns:
   /// - (`Future<void>`): A future that completes when initialization is done.
-  ///
-  /// ### Throws:
-  /// - (Exception): If [MainVehicle.initialize] fails.
   Future<void> initializeProvider() async {
     try {
       notifyListeners();
@@ -98,14 +88,13 @@ class TelemetryProvider extends ChangeNotifier {
     }
   }
 
-  /// Starts the high-priority telemetry stream and mobile sensor tracking.
+  /// Starts the high-priority telemetry stream and sets the polling interval.
   ///
   /// ### Usage:
   /// ```dart
   /// provider.startTelemetryStream();
   /// ```
   void startTelemetryStream() {
-    // Start OBD Stream
     final telemetry = _saeJ1979.telemetry;
 
     _telemetrySession = telemetry.stream(
@@ -127,7 +116,7 @@ class TelemetryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Internal handler for parsing raw OBD-II packets into class fields.
+  /// Internal handler for parsing raw OBD-II packets and triggering throttled updates.
   ///
   /// ### Parameters:
   /// - (`TelemetryData`) data: The raw packet received from the [TelemetrySession].
@@ -137,33 +126,42 @@ class TelemetryProvider extends ChangeNotifier {
     if (data.hasData(telemetry.rpm) == true) {
       engineRpm = data.get(telemetry.rpm);
     }
-
     if (data.hasData(telemetry.speed) == true) {
       vehicleSpeed = data.get(telemetry.speed);
     }
-
     if (data.hasData(telemetry.coolantTemperature) == true) {
       coolantTemperature = data.get(telemetry.coolantTemperature);
     }
-
     if (data.hasData(telemetry.throttlePosition) == true) {
       throttlePosition = data.get(telemetry.throttlePosition);
     }
-
     if (data.hasData(telemetry.engineLoad) == true) {
       engineLoad = data.get(telemetry.engineLoad);
     }
-
     if (data.hasData(telemetry.timingAdvance) == true) {
       timingAdvance = data.get(telemetry.timingAdvance);
     }
 
-    notifyListeners();
+    _needsUpdate = true;
+    _runThrottledUpdate();
   }
 
-  /// Terminates all active OBD-II and mobile sensor streams.
+  /// Throttles the [notifyListeners] call to ~30 FPS to maintain UI performance.
+  void _runThrottledUpdate() {
+    if (_uiUpdateTimer?.isActive ?? false) return;
+
+    _uiUpdateTimer = Timer(const Duration(milliseconds: 33), () {
+      if (_needsUpdate) {
+        notifyListeners();
+        _needsUpdate = false;
+      }
+    });
+  }
+
+  /// Terminates all active OBD-II streams and cancels the UI update timer.
   void stopTelemetryStream() {
     _telemetrySession?.stop();
+    _uiUpdateTimer?.cancel();
     isStreaming = false;
     notifyListeners();
   }
@@ -172,6 +170,7 @@ class TelemetryProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopTelemetryStream();
+    _uiUpdateTimer?.cancel();
     super.dispose();
   }
 }

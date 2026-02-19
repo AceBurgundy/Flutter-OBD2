@@ -1,3 +1,4 @@
+import 'dart:ui'; // Required for FontFeature
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -42,6 +43,10 @@ enum ValueType { percent, temperature }
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
+  // Fixed widths for the columns
+  static const double columnWidth = 160.0;
+  static const double spacingHeight = 40.0;
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TelemetryProvider>();
@@ -54,132 +59,154 @@ class DashboardPage extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 displayValue,
-                style: const TextStyle(fontSize: 55, color: Colors.white, fontWeight: FontWeight.bold, height: 1),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  unit,
-                  style: const TextStyle(fontSize: 20, color: Colors.white70, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 55,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  height: 1,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                unit,
+                style: const TextStyle(fontSize: 15, color: Colors.white70, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          Text(label.toUpperCase(), style: const TextStyle(fontSize: 12, color: Colors.grey, letterSpacing: 1.2)),
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
         ],
       );
     }
 
-    // REMOVED Expanded to allow items to sit closer together
-    Widget itemsGroup(List<Widget> items) => Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: items,
-    );
-
     final bool isBluetoothConnected = provider.scanner?.isConnected == true;
-    String statusMessage = provider.isStreaming
-        ? "STREAMING DATA"
-        : (isBluetoothConnected ? "CONNECTED" : "DISCONNECTED");
 
+    String statusMessage;
+
+    if (provider.isStreaming) {
+      statusMessage = "Stream Started";
+    } else if (isBluetoothConnected) {
+      statusMessage = "Bluetooth Connected";
+    } else {
+      statusMessage = "Bluetooth Disconnected";
+    }
+
+    /// Toggles the telemetry data stream on or off.
+    ///
+    /// Handles error logging and user notification via snackbars if the
+    /// connection or stream fails.
+    ///
+    /// ### Usage:
+    /// ```dart
+    /// toggleStream();
+    /// ```
     void toggleStream() {
       if (provider.isStreaming) {
         try {
           provider.stopTelemetryStream();
-          snackBar(context, "Stream Stopped");
+          snackBar(context, "Live Stream Stopped!");
         } catch (error, stack) {
-          logError(error, stack);
+          logError(error, stack, message: "Error when stopping stream");
+          snackBar(context, "Stream break error");
         }
-      } else {
-        if (provider.scanner == null) return;
+        return;
+      }
+
+      try {
+        if (provider.scanner == null) {
+          snackBar(context, "Scanner is missing. Connect to one");
+          return;
+        }
         provider.startTelemetryStream();
+        snackBar(context, "Live stream started!");
+      } catch (error, stack) {
+        logError(error, stack, message: 'Failed to start live data streaming');
+        snackBar(context, "Live stream failed! Something went wrong");
+        provider.stopTelemetryStream();
       }
     }
 
     return Scaffold(
       backgroundColor: background,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Column(
-            children: [
-              const Spacer(flex: 1),
-
-              Expanded(
-                flex: 7,
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
+        children: [
+          const Spacer(flex: 1),
+          Expanded(
+            flex: 7,
+            child: Center(
+              child: Table(
+                // This defines the strict width of your grid
+                defaultColumnWidth: const FixedColumnWidth(columnWidth),
+                children: [
+                  TableRow(
                     children: [
-                      itemsGroup([
-                        telemetryItem("RPM", provider.engineRpm),
-                        const SizedBox(height: 40),
-                        telemetryItem("Throttle", provider.throttlePosition),
-                      ]),
-
-                      const SizedBox(width: 150),
-
-                      itemsGroup([
-                        telemetryItem("Speed", provider.vehicleSpeed),
-                        const SizedBox(height: 40),
-                        telemetryItem("Load", provider.engineLoad),
-                      ]),
-
-                      const SizedBox(width: 150),
-
-                      itemsGroup([
-                        telemetryItem("Coolant", provider.coolantTemperature, type: ValueType.temperature),
-                        const SizedBox(height: 40),
-                        telemetryItem("Timing", provider.timingAdvance),
-                      ]),
+                      telemetryItem("RPM", provider.engineRpm),
+                      telemetryItem("Speed", provider.vehicleSpeed),
+                      telemetryItem("Coolant", provider.coolantTemperature, type: ValueType.temperature),
                     ],
                   ),
-                ),
-              ),
-
-              Expanded(
-                flex: 2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
-                  color: Colors.white.withValues(alpha: 0.03),
-                  child: Row(
+                  // Spacer Row
+                  const TableRow(
                     children: [
-                      Icon(
-                        Icons.circle,
-                        size: 12,
-                        color: isBluetoothConnected ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        statusMessage,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 1),
-                      ),
-                      const Spacer(),
-
-                      _ControlButton(
-                        icon: Icons.bluetooth,
-                        color: isBluetoothConnected ? Colors.blue : Colors.grey[800]!,
-                        onPressed: () => BluetoothHelper.handleShowDevices(context, provider),
-                      ),
-                      const SizedBox(width: 15),
-
-                      _ControlButton(
-                        icon: provider.isStreaming ? Icons.stop : Icons.play_arrow,
-                        color: provider.isStreaming ? Colors.redAccent : Colors.green,
-                        onPressed: toggleStream,
-                      ),
+                      SizedBox(height: spacingHeight),
+                      SizedBox(height: spacingHeight),
+                      SizedBox(height: spacingHeight),
                     ],
                   ),
-                ),
+                  TableRow(
+                    children: [
+                      telemetryItem("Throttle", provider.throttlePosition),
+                      telemetryItem("Load", provider.engineLoad),
+                      telemetryItem("Timing", provider.timingAdvance),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          );
-        },
+            ),
+          ),
+          // Bottom Bar
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              color: Colors.white.withValues(alpha: 0.03),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.circle,
+                    size: 12,
+                    color: isBluetoothConnected ? Colors.green : Colors.red,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    statusMessage,
+                    style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 1),
+                  ),
+                  const Spacer(),
+                  _ControlButton(
+                    icon: Icons.bluetooth,
+                    color: isBluetoothConnected ? Colors.blue : Colors.grey[800]!,
+                    onPressed: () => BluetoothHelper.handleShowDevices(context, provider),
+                  ),
+                  const SizedBox(width: 15),
+                  _ControlButton(
+                    icon: provider.isStreaming ? Icons.stop : Icons.play_arrow,
+                    color: provider.isStreaming ? Colors.redAccent : Colors.green,
+                    onPressed: () => toggleStream(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

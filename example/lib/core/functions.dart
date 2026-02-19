@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
@@ -46,34 +47,53 @@ void logPrint(Object? message, {bool isError = false}) {
 /// logError(message: "An error occurred", error: e, stackTrace: stack);
 /// ```
 Future<void> logError(dynamic error, StackTrace? stackTrace, { String? message }) async {
-    // Console Logging (Debug Mode Only)
+  // Console Logging (Debug Mode Only)
+  if (kDebugMode) {
+    if (message != null) logPrint(message, isError: true);
+    if (error != null) logPrint(error.toString(), isError: true);
+    if (stackTrace != null) logPrint(stackTrace.toString(), isError: true);
+  }
+
+  // File Logging
+  try {
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/error_log.txt');
+
+    final logBuffer = StringBuffer();
+    logBuffer.writeln('--- ${DateTime.now()} ---');
+    if (message != null) logBuffer.writeln('Message: $message');
+    if (error != null) logBuffer.writeln('Error: $error');
+    if (stackTrace != null) logBuffer.writeln('StackTrace: $stackTrace');
+
+    await file.writeAsString(
+      logBuffer.toString(),
+      mode: FileMode.append,
+      flush: true,
+    );
+  } catch (error, stack) {
+    // Fallback if file system fails
     if (kDebugMode) {
-      if (message != null) logPrint(message, isError: true);
-      if (error != null) logPrint(error.toString(), isError: true);
-      if (stackTrace != null) logPrint(stackTrace.toString(), isError: true);
+      debugPrint('\x1B[31mFailed to log error to file: $error\x1B[0m');
+      debugPrint('\x1B[31m$stack\x1B[0m');
     }
-
-    // File Logging
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/error_log.txt');
-
-      final logBuffer = StringBuffer();
-      logBuffer.writeln('--- ${DateTime.now()} ---');
-      if (message != null) logBuffer.writeln('Message: $message');
-      if (error != null) logBuffer.writeln('Error: $error');
-      if (stackTrace != null) logBuffer.writeln('StackTrace: $stackTrace');
-
-      await file.writeAsString(
-        logBuffer.toString(),
-        mode: FileMode.append,
-        flush: true,
-      );
-    } catch (error, stack) {
-      // Fallback if file system fails
-      if (kDebugMode) {
-        debugPrint('\x1B[31mFailed to log error to file: $error\x1B[0m');
-        debugPrint('\x1B[31m$stack\x1B[0m');
-      }
-    }
+  }
 }
+
+/// Displays a temporary message at the bottom of the screen using a [SnackBar].
+///
+/// Finds the nearest [ScaffoldMessenger] in the widget tree using the provided [context]
+/// and displays a standard [SnackBar] containing the [message].
+///
+/// ### Parameters
+/// - [BuildContext] (`context`): Required to locate the [ScaffoldMessenger].
+/// - [String] (`message`): The text content to display.
+///
+/// ### Example
+/// ```dart
+/// snackBar(context, "Bluetooth connected successfully!");
+/// ```
+void snackBar(BuildContext context, String message) => ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content:
+    Text(message)
+    )
+);

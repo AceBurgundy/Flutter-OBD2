@@ -66,7 +66,7 @@ class TelemetryProvider extends ChangeNotifier {
     try {
       notifyListeners();
     } catch (error, stack) {
-      logError(error, stack, message: 'Failed to initialize vehicle data storage.');
+      logError(error, stack, message: 'Failed to initialize vehicle data storage');
     }
   }
 
@@ -85,13 +85,13 @@ class TelemetryProvider extends ChangeNotifier {
       if (isStreaming) {
         stopTelemetryStream();
       }
-      await scanner?.disconnect();
 
+      await scanner?.disconnect();
       scanner = BluetoothAdapterOBD2(standard: _saeJ1979);
       await scanner!.connect(device);
       connectedDevice = device;
     } catch (error, stack) {
-      logError(error, stack, message: 'Could not establish connection to ${device.platformName}.');
+      logError(error, stack, message: 'Could not establish connection to ${device.platformName}');
     } finally {
       isConnecting = false;
       notifyListeners();
@@ -105,32 +105,26 @@ class TelemetryProvider extends ChangeNotifier {
   /// provider.startTelemetryStream();
   /// ```
   void startTelemetryStream() {
-    if (scanner == null || !scanner!.isConnected) return;
+    // Start OBD Stream
+    final telemetry = _saeJ1979.telemetry;
 
-    try {
-      // Start OBD Stream
-      final telemetry = _saeJ1979.telemetry;
-      _telemetrySession = telemetry.stream(
-        adapter: scanner!,
-        pollIntervalMs: 10,
-        detailedPIDs: [
-          telemetry.rpm,
-          telemetry.speed,
-          telemetry.coolantTemperature,
-          telemetry.throttlePosition,
-          telemetry.engineLoad,
-          telemetry.intakeAirTemperature,
-          telemetry.timingAdvance,
-        ],
-        onData: _processIncomingTelemetry,
-      );
+    _telemetrySession = telemetry.stream(
+      adapter: scanner!,
+      pollIntervalMs: 10,
+      detailedPIDs: [
+        telemetry.rpm,
+        telemetry.speed,
+        telemetry.coolantTemperature,
+        telemetry.throttlePosition,
+        telemetry.engineLoad,
+        telemetry.intakeAirTemperature,
+        telemetry.timingAdvance,
+      ],
+      onData: _processIncomingTelemetry,
+    );
 
-      isStreaming = true;
-      notifyListeners();
-    } catch (error, stack) {
-      logError(error, stack, message: 'Failed to start live data streaming.');
-      stopTelemetryStream();
-    }
+    isStreaming = true;
+    notifyListeners();
   }
 
   /// Internal handler for parsing raw OBD-II packets into class fields.
@@ -169,13 +163,9 @@ class TelemetryProvider extends ChangeNotifier {
 
   /// Terminates all active OBD-II and mobile sensor streams.
   void stopTelemetryStream() {
-    try {
-      _telemetrySession?.stop();
-      isStreaming = false;
-      notifyListeners();
-    } catch (error, stack) {
-      logError(error, stack, message: 'Error encountered while stopping streams.');
-    }
+    _telemetrySession?.stop();
+    isStreaming = false;
+    notifyListeners();
   }
 
   /// Properly closes resources when the provider is removed from the widget tree.

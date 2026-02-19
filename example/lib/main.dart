@@ -1,23 +1,19 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:obd2/obd2.dart';
 import 'package:provider/provider.dart';
+
+// Import your core files and the new helper
+import 'core/bluetooth_helper.dart';
 import 'core/functions.dart';
-import 'core/permission_manager.dart';
 import 'core/telemetry_provider.dart';
 
-final GlobalKey<ScaffoldMessengerState> snackBarKey =
-GlobalKey<ScaffoldMessengerState>();
+final GlobalKey<ScaffoldMessengerState> snackBarKey = GlobalKey<ScaffoldMessengerState>();
 const Color background = Color(0xFF131313);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.landscapeLeft,
-  ]);
-
+  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   runApp(
@@ -44,50 +40,6 @@ class SampleApp extends StatelessWidget {
   }
 }
 
-Future<void> _handleShowDevices(
-    BuildContext context, TelemetryProvider provider) async {
-  try {
-    final bool hasPermission = await PermissionManager.requestHardwarePermissions();
-    if (!hasPermission) return;
-
-    final List<BluetoothDevice> pairedDevices =
-    await FlutterBluePlus.bondedDevices;
-
-    if (!context.mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Select OBD-II Adapter'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: pairedDevices.length,
-            itemBuilder: (context, index) {
-              final device = pairedDevices[index];
-              return ListTile(
-                leading: const Icon(Icons.bluetooth),
-                title: Text(
-                  device.platformName.isNotEmpty
-                      ? device.platformName
-                      : device.remoteId.toString(),
-                ),
-                onTap: () {
-                  provider.connectToDevice(device);
-                  Navigator.pop(dialogContext);
-                },
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  } catch (error, stack) {
-    logError(error, stack, message: 'Failed to retrieve paired Bluetooth devices.');
-  }
-}
-
 enum ValueType { percent, temperature }
 
 class DashboardPage extends StatelessWidget {
@@ -103,23 +55,34 @@ class DashboardPage extends StatelessWidget {
 
       return Expanded(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              "$displayValue$unit",
-              style: const TextStyle(
-                fontSize: 52,
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  displayValue,
+                  style: const TextStyle(
+                    fontSize: 50,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  unit,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
           ],
         ),
@@ -137,43 +100,87 @@ class DashboardPage extends StatelessWidget {
       statusMessage = "Bluetooth Disconnected";
     }
 
+    toggleStream() {
+      // Toggle between start or stop stream
+      if (provider.isStreaming) {
+        try {
+          provider.stopTelemetryStream();
+          snackBar(context, "Live Stream Stopped!");
+        } catch (error, stack) {
+          logError(error, stack, message: "Error when stopping stream");
+          snackBar(context, "Stream break error");
+        }
+
+        return;
+      }
+
+      try {
+        if (provider.scanner == null) {
+          snackBar(context, "Scanner is missing. Connect to one");
+          return;
+        }
+
+        if (provider.scanner!.isConnected) {
+          snackBar(context, "Scanner exist but is not connected");
+          return;
+        }
+
+        provider.startTelemetryStream();
+        snackBar(context, "Live stream started!");
+      } catch (error, stack) {
+        logError(error, stack, message: 'Failed to start live data streaming');
+        snackBar(context, "Live stream failed! Something went wrong");
+        provider.stopTelemetryStream();
+      }
+    }
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: background,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final totalHeight = constraints.maxHeight;
 
           return Column(
             children: [
+              SizedBox(height: totalHeight * 0.10),
               SizedBox(
-                height: totalHeight * 0.45,
-                child: Row(
+                height: totalHeight * 0.70,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    buildTelemetryItem("RPM", provider.engineRpm),
-                    buildTelemetryItem("Speed", provider.vehicleSpeed),
-                    buildTelemetryItem(
-                      "Coolant",
-                      provider.coolantTemperature,
-                      type: ValueType.temperature,
+                    Row(
+                      children: [
+                        buildTelemetryItem("RPM", provider.engineRpm),
+                        buildTelemetryItem("Speed", provider.vehicleSpeed),
+                        buildTelemetryItem(
+                          "Coolant Temperature",
+                          provider.coolantTemperature,
+                          type: ValueType.temperature,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    Row(
+                      children: [
+                        buildTelemetryItem(
+                          "Throttle Position",
+                          provider.throttlePosition,
+                        ),
+                        buildTelemetryItem("Engine Load", provider.engineLoad),
+                        buildTelemetryItem(
+                          "Timing Advance",
+                          provider.timingAdvance,
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               SizedBox(
-                height: totalHeight * 0.45,
-                child: Row(
-                  children: [
-                    buildTelemetryItem("Throttle", provider.throttlePosition),
-                    buildTelemetryItem("Engine Load", provider.engineLoad),
-                    buildTelemetryItem("Timing", provider.timingAdvance),
-                  ],
-                ),
-              ),
-              SizedBox(
-                height: totalHeight * 0.10,
+                height: totalHeight * 0.20,
                 child: Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
                       Text(
@@ -189,12 +196,14 @@ class DashboardPage extends StatelessWidget {
                           color: isBluetoothConnected
                               ? Colors.blue
                               : Colors.green,
-                          borderRadius:
-                          BorderRadius.circular(30),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: IconButton(
-                          onPressed: () =>
-                              _handleShowDevices(context, provider),
+                          // Call your new helper class here!
+                          onPressed: () => BluetoothHelper.handleShowDevices(
+                            context,
+                            provider,
+                          ),
                           icon: const Icon(
                             Icons.bluetooth,
                             color: Colors.white,
@@ -207,13 +216,10 @@ class DashboardPage extends StatelessWidget {
                           color: provider.isStreaming
                               ? Colors.blue
                               : Colors.green,
-                          borderRadius:
-                          BorderRadius.circular(30),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: IconButton(
-                          onPressed: provider.isStreaming
-                              ? provider.stopTelemetryStream
-                              : provider.startTelemetryStream,
+                          onPressed: () => toggleStream(),
                           icon: Icon(
                             provider.isStreaming
                                 ? Icons.stop
@@ -225,7 +231,7 @@ class DashboardPage extends StatelessWidget {
                     ]
                   )
                 )
-              )
+              ),
             ]
           );
         }

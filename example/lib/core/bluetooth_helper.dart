@@ -1,6 +1,7 @@
 // bluetooth_helper.dart
 
 import 'dart:io';
+import 'package:example/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'functions.dart';
@@ -50,6 +51,7 @@ class BluetoothHelper {
 
       // Permissions and device fetching
       final bool hasPermission = await PermissionManager.requestHardwarePermissions();
+
       if (!hasPermission) {
         if (!context.mounted) return;
         snackBar(context, 'Hardware permissions denied');
@@ -69,7 +71,10 @@ class BluetoothHelper {
       showDialog(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Select OBD-II Adapter'),
+          title: const Text(
+              'Select OBD-II Adapter', style: TextStyle(color: Colors.white)
+          ),
+          backgroundColor: background,
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
@@ -78,8 +83,11 @@ class BluetoothHelper {
               itemBuilder: (context, index) {
                 final device = pairedDevices[index];
                 return ListTile(
-                  leading: const Icon(Icons.bluetooth),
-                  title: Text(device.platformName.isNotEmpty ? device.platformName : "Unknown Device"),
+                  leading: const Icon(Icons.bluetooth, color: Colors.white),
+                  title: Text(
+                      device.platformName.isNotEmpty ? device.platformName : "Unknown Device",
+                      style: TextStyle(color: Colors.white)
+                  ),
                   onTap: () {
                     provider.connectToDevice(device);
                     Navigator.pop(dialogContext);

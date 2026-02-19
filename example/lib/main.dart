@@ -1,9 +1,7 @@
-// main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-// Import your core files and the new helper
 import 'core/bluetooth_helper.dart';
 import 'core/functions.dart';
 import 'core/telemetry_provider.dart';
@@ -13,7 +11,7 @@ const Color background = Color(0xFF131313);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   runApp(
@@ -49,88 +47,58 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<TelemetryProvider>();
 
-    Widget buildTelemetryItem(String label, double? value, { ValueType type = ValueType.percent }) {
+    Widget telemetryItem(String label, double? value, {ValueType type = ValueType.percent}) {
       final displayValue = (value ?? 0).toStringAsFixed(0);
       final unit = type == ValueType.temperature ? "°C" : "%";
 
-      return Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  displayValue,
-                  style: const TextStyle(
-                    fontSize: 50,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayValue,
+                style: const TextStyle(fontSize: 55, color: Colors.white, fontWeight: FontWeight.bold, height: 1),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
                   unit,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: const TextStyle(fontSize: 20, color: Colors.white70, fontWeight: FontWeight.bold),
                 ),
-              ],
-            ),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          Text(label.toUpperCase(), style: const TextStyle(fontSize: 12, color: Colors.grey, letterSpacing: 1.2)),
+        ],
       );
     }
 
+    // REMOVED Expanded to allow items to sit closer together
+    Widget itemsGroup(List<Widget> items) => Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: items,
+    );
+
     final bool isBluetoothConnected = provider.scanner?.isConnected == true;
+    String statusMessage = provider.isStreaming
+        ? "STREAMING DATA"
+        : (isBluetoothConnected ? "CONNECTED" : "DISCONNECTED");
 
-    String statusMessage;
-    if (provider.isStreaming) {
-      statusMessage = "Stream Started";
-    } else if (isBluetoothConnected) {
-      statusMessage = "Bluetooth Connected";
-    } else {
-      statusMessage = "Bluetooth Disconnected";
-    }
-
-    toggleStream() {
-      // Toggle between start or stop stream
+    void toggleStream() {
       if (provider.isStreaming) {
         try {
           provider.stopTelemetryStream();
-          snackBar(context, "Live Stream Stopped!");
+          snackBar(context, "Stream Stopped");
         } catch (error, stack) {
-          logError(error, stack, message: "Error when stopping stream");
-          snackBar(context, "Stream break error");
+          logError(error, stack);
         }
-
-        return;
-      }
-
-      try {
-        if (provider.scanner == null) {
-          snackBar(context, "Scanner is missing. Connect to one");
-          return;
-        }
-
-        if (provider.scanner!.isConnected) {
-          snackBar(context, "Scanner exist but is not connected");
-          return;
-        }
-
+      } else {
+        if (provider.scanner == null) return;
         provider.startTelemetryStream();
-        snackBar(context, "Live stream started!");
-      } catch (error, stack) {
-        logError(error, stack, message: 'Failed to start live data streaming');
-        snackBar(context, "Live stream failed! Something went wrong");
-        provider.stopTelemetryStream();
       }
     }
 
@@ -138,104 +106,106 @@ class DashboardPage extends StatelessWidget {
       backgroundColor: background,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final totalHeight = constraints.maxHeight;
-
           return Column(
             children: [
-              SizedBox(height: totalHeight * 0.10),
-              SizedBox(
-                height: totalHeight * 0.70,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        buildTelemetryItem("RPM", provider.engineRpm),
-                        buildTelemetryItem("Speed", provider.vehicleSpeed),
-                        buildTelemetryItem(
-                          "Coolant Temperature",
-                          provider.coolantTemperature,
-                          type: ValueType.temperature,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 40),
-                    Row(
-                      children: [
-                        buildTelemetryItem(
-                          "Throttle Position",
-                          provider.throttlePosition,
-                        ),
-                        buildTelemetryItem("Engine Load", provider.engineLoad),
-                        buildTelemetryItem(
-                          "Timing Advance",
-                          provider.timingAdvance,
-                        ),
-                      ],
-                    ),
-                  ],
+              const Spacer(flex: 1),
+
+              Expanded(
+                flex: 7,
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      itemsGroup([
+                        telemetryItem("RPM", provider.engineRpm),
+                        const SizedBox(height: 40),
+                        telemetryItem("Throttle", provider.throttlePosition),
+                      ]),
+
+                      const SizedBox(width: 150),
+
+                      itemsGroup([
+                        telemetryItem("Speed", provider.vehicleSpeed),
+                        const SizedBox(height: 40),
+                        telemetryItem("Load", provider.engineLoad),
+                      ]),
+
+                      const SizedBox(width: 150),
+
+                      itemsGroup([
+                        telemetryItem("Coolant", provider.coolantTemperature, type: ValueType.temperature),
+                        const SizedBox(height: 40),
+                        telemetryItem("Timing", provider.timingAdvance),
+                      ]),
+                    ],
+                  ),
                 ),
               ),
-              SizedBox(
-                height: totalHeight * 0.20,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  color: Colors.white.withValues(alpha: 0.03),
                   child: Row(
                     children: [
+                      Icon(
+                        Icons.circle,
+                        size: 12,
+                        color: isBluetoothConnected ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 10),
                       Text(
                         statusMessage,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                        ),
+                        style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 1),
                       ),
                       const Spacer(),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isBluetoothConnected
-                              ? Colors.blue
-                              : Colors.green,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: IconButton(
-                          // Call your new helper class here!
-                          onPressed: () => BluetoothHelper.handleShowDevices(
-                            context,
-                            provider,
-                          ),
-                          icon: const Icon(
-                            Icons.bluetooth,
-                            color: Colors.white,
-                          ),
-                        ),
+
+                      _ControlButton(
+                        icon: Icons.bluetooth,
+                        color: isBluetoothConnected ? Colors.blue : Colors.grey[800]!,
+                        onPressed: () => BluetoothHelper.handleShowDevices(context, provider),
                       ),
-                      const SizedBox(width: 16),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: provider.isStreaming
-                              ? Colors.blue
-                              : Colors.green,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: IconButton(
-                          onPressed: () => toggleStream(),
-                          icon: Icon(
-                            provider.isStreaming
-                                ? Icons.stop
-                                : Icons.play_arrow,
-                            color: Colors.white,
-                          )
-                        )
-                      )
-                    ]
-                  )
-                )
+                      const SizedBox(width: 15),
+
+                      _ControlButton(
+                        icon: provider.isStreaming ? Icons.stop : Icons.play_arrow,
+                        color: provider.isStreaming ? Colors.redAccent : Colors.green,
+                        onPressed: toggleStream,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ]
+            ],
           );
-        }
-      )
+        },
+      ),
+    );
+  }
+}
+
+class _ControlButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _ControlButton({required this.icon, required this.color, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+      ),
     );
   }
 }

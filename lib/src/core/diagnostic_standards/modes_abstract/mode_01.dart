@@ -24,60 +24,6 @@
     /// OBD-II service mode identifier (e.g. "01").
     static String get mode => throw UnimplementedError();
   
-    /// Engine speed in revolutions per minute.
-    DetailedPID<double> get rpm;
-  
-    /// Vehicle speed.
-    DetailedPID<double> get speed;
-  
-    /// Vehicle odometer.
-    DetailedPID<double> get odometer;
-  
-    /// Engine coolant temperature.
-    DetailedPID<double> get coolantTemperature;
-  
-    /// Intake air temperature.
-    DetailedPID<double> get intakeAirTemperature;
-  
-    /// Throttle position percentage.
-    DetailedPID<double> get throttlePosition;
-  
-    /// Calculated engine load.
-    DetailedPID<double> get engineLoad;
-  
-    /// Mass air flow rate.
-    DetailedPID<double> get massAirFlow;
-  
-    /// Fuel level input.
-    DetailedPID<double> get fuelLevel;
-  
-    /// Intake manifold absolute pressure.
-    DetailedPID<double> get intakeManifoldPressure;
-  
-    /// Ignition timing advance.
-    DetailedPID<double> get timingAdvance;
-  
-    /// Data that can be extracted for AFR.
-    DetailedPID<List<double>> get lambdaBank1Sensor1;
-  
-    /// Barometric pressure.
-    DetailedPID<double> get barometricPressure;
-  
-    /// ECU control module voltage.
-    DetailedPID<double> get controlModuleVoltage;
-  
-    /// Engine oil temperature.
-    DetailedPID<double> get oilTemperature;
-  
-    /// Fuel consumption rate.
-    DetailedPID<double> get fuelRate;
-  
-    /// Ambient air temperature.
-    DetailedPID<double> get ambientAirTemperature;
-  
-    /// Fuel type identifier.
-    DetailedPID<String> get fuelType;
-  
     /// Starts a smart, priority-based telemetry streaming session.
     ///
     /// This stream automatically manages scheduling based on the [bestPollingIntervalMs]

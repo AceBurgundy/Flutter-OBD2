@@ -27,7 +27,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   /// OBD-II service mode for live powertrain data.
   static const String mode = '01';
 
-  @override
   final DetailedPID<double> rpm = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010C',
@@ -36,7 +35,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 10
   );
 
-  @override
   final DetailedPID<double> speed = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010D',
@@ -44,7 +42,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '[0]',
   );
 
-  @override
   final DetailedPID<double> odometer = const DetailedPID(
       DiagnosticStandardIDs.saeJ1979,
     '01A6',
@@ -53,7 +50,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       bestPollingIntervalMs: 10000
   );
 
-  @override
   final DetailedPID<double> coolantTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0105',
@@ -62,7 +58,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 5000
   );
 
-  @override
   final DetailedPID<double> intakeAirTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010F',
@@ -71,7 +66,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 2000
   );
 
-  @override
   final DetailedPID<double> throttlePosition = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0111',
@@ -79,7 +73,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '[0] * 100 / 255',
   );
 
-  @override
   final DetailedPID<double> engineLoad = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0104',
@@ -87,7 +80,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '[0] * 100 / 255',
   );
 
-  @override
   final DetailedPID<double> massAirFlow = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0110',
@@ -95,7 +87,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '([0] * 256 + [1]) / 100',
   );
 
-  @override
   final DetailedPID<double> fuelLevel = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '012F',
@@ -104,7 +95,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 10000
   );
 
-  @override
   final DetailedPID<double> intakeManifoldPressure = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010B',
@@ -112,7 +102,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '[0]',
   );
 
-  @override
   final DetailedPID<double> timingAdvance = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '010E',
@@ -124,8 +113,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   ///
   /// This PID returns a composite list of two values:
   /// - Index 0: Lambda (Equivalence Ratio)
-  /// - Index 1: Sensor Voltage
-  @override
+  ///
   final DetailedPID<List<double>> lambdaBank1Sensor1 = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     "0124",
@@ -134,7 +122,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     obd2QueryReturnType: OBD2QueryReturnValue.composite,
   );
 
-  @override
   final DetailedPID<double> barometricPressure = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0133',
@@ -142,7 +129,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '[0]',
   );
 
-  @override
   final DetailedPID<double> controlModuleVoltage = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0142',
@@ -151,7 +137,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 1000
   );
 
-  @override
   final DetailedPID<double> oilTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '015C',
@@ -159,7 +144,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '[0] - 40',
   );
 
-  @override
   final DetailedPID<double> fuelRate = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '015E',
@@ -167,7 +151,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '([0] * 256 + [1]) / 20',
   );
 
-  @override
   final DetailedPID<double> ambientAirTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0146',
@@ -176,7 +159,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     bestPollingIntervalMs: 10000
   );
 
-  @override
   final DetailedPID<String> fuelType = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0151',

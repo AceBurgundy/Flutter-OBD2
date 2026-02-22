@@ -467,7 +467,6 @@ class Telemetry {
   /// ### Parameters:
   /// - [detailedPIDs]: A list of Parameter IDs to be polled.
   /// - [onData]: A callback triggered when new telemetry data is received.
-  /// - [adapter]: The physical or virtual adapter used for communication.
   /// - [pollIntervalMs]: The delay in milliseconds between each request.
   ///
   /// ### Returns:
@@ -487,10 +486,9 @@ class Telemetry {
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
-    required AdapterOBD2 adapter,
     int pollIntervalMs = 10,
   }) {
-    if (!adapter.isConnected) {
+    if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
@@ -502,7 +500,7 @@ class Telemetry {
     int index = 0;
 
     Future<void> smartLoop() async {
-      while (isRunning && adapter.isConnected) {
+      while (isRunning && _adapter.isConnected) {
         final now = DateTime.now().millisecondsSinceEpoch;
         // Safety check: ensure the index is within bounds if the list changes (though unexpected here)
         if (detailedPIDs.isEmpty) break;
@@ -515,7 +513,7 @@ class Telemetry {
 
         if (now - lastTime >= targetInterval) {
           try {
-            final value = await adapter.queryPID(pid);
+            final value = await _adapter.queryPID(pid);
             if (isRunning) {
               onData(TelemetryData({pid: value}));
               lastQueryTimestamps[pid] = DateTime.now().millisecondsSinceEpoch;
@@ -575,7 +573,6 @@ class Telemetry {
   ///
   /// ### Parameters:
   /// - [detailedPIDs]: The list of [DetailedPID] objects to fetch.
-  /// - [adapter]: The active [AdapterOBD2] connection.
   ///
   /// ### Returns:
   /// - (`Future<Map<DetailedPID, dynamic>>`): A map where keys are the
@@ -586,13 +583,16 @@ class Telemetry {
   ///   during the query process.
   Future<Map<DetailedPID, dynamic>> query({
     required List<DetailedPID> detailedPIDs,
-    required AdapterOBD2 adapter,
   }) async {
+    if (!_adapter.isConnected) {
+      throw StateError('Adapter is not connected.');
+    }
+
     final Map<DetailedPID, dynamic> results = {};
 
     for (final DetailedPID pid in detailedPIDs) {
       // We allow errors to propagate naturally to the caller
-      final dynamic value = await adapter.queryPID(pid);
+      final dynamic value = await _adapter.queryPID(pid);
       results[pid] = value;
     }
 

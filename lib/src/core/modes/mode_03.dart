@@ -26,10 +26,10 @@ class ReadCodes {
   ///
   /// ### Usage:
   /// ```dart
-  /// final codes = await mode03.getDiagnosticTroubleCodes();
+  /// final codes = await mode03.getDTCs();
   /// print(codes); // ['P0100', 'P0200']
   /// ```
-  Future<List<String>> getDiagnosticTroubleCodes() async {
+  Future<List<String>> getDTCs() async {
     if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }

@@ -26,12 +26,12 @@ class ClearCodes {
   ///
   /// ### Usage:
   /// ```dart
-  /// final success = await mode04.clearDiagnosticTroubleCodes();
+  /// final success = await mode04.eraseDTCs();
   /// if (success) {
   ///   print('Codes cleared successfully.');
   /// }
   /// ```
-  Future<bool> clearDiagnosticTroubleCodes() async {
+  Future<bool> eraseDTCs() async {
     if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }

@@ -146,7 +146,7 @@ print("Supported PIDs: $supported");
 ```dart
 final freeze = adapter.protocol.freezeFrame;
 
-final snapshot = await freeze.getFreezeFrameData(
+final snapshot = await freeze.getFrameData(
   detailedPIDs: [
     freeze.rpm,
     freeze.speed,
@@ -159,7 +159,7 @@ print(snapshot.get(freeze.rpm));
 # 🚨 Mode 03 — Read Diagnostic Trouble Codes
 
 ```dart
-final codes = await adapter.protocol.readCodes.getDiagnosticTroubleCodes();
+final codes = await adapter.protocol.readCodes.getDTCs();
 
 print("Fault Codes: $codes");
 ```
@@ -167,7 +167,7 @@ print("Fault Codes: $codes");
 # 🧹 Mode 04 — Clear Diagnostic Trouble Codes
 
 ```dart
-final success = await adapter.protocol.clearCodes.clearDiagnosticTroubleCodes();
+final success = await adapter.protocol.clearCodes.eraseDTCs();
 
 print("Cleared: $success");
 ```

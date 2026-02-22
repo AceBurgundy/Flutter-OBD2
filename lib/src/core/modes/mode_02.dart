@@ -13,7 +13,7 @@ class FreezeFrame {
   /// - (AdapterOBD2): Active adapter instance.
   FreezeFrame(this._adapter);
 
-  final DetailedPID<String> dtcCausingFreeze = const DetailedPID(
+  final DetailedPID<String> specificFreezeDTC = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0202',
     'DTC Causing Freeze Frame',
@@ -71,15 +71,15 @@ class FreezeFrame {
   ///
   /// ### Usage:
   /// ```dart
-  /// final data = await mode02.getFreezeFrameData(
+  /// final data = await mode02.getFrameData(
   ///   detailedPIDs: [mode02.rpm, mode02.speed],
   ///   adapter: myAdapter,
   /// );
   /// ```
-  Future<TelemetryData> getFreezeFrameData({ required List<DetailedPID> detailedPIDs }) async {
+  Future<TelemetryData> getFrameData({ required List<DetailedPID> detailedPIDs }) async {
     final Map<DetailedPID, dynamic> results = {};
 
-    for (final DetailedPID pid in detailedPIDs) {
+    for (final DetailedPID detailedPID in detailedPIDs) {
       try {
         dynamic value;
 
@@ -87,7 +87,7 @@ class FreezeFrame {
         // We reuse the standard query, but we might need to interpret the bytes
         // as a DTC string if the adapter returns raw bytes.
         // Assuming adapter.queryPID handles the 'text' return type logic we set up.
-        if (pid.parameterID == '0202') {
+        if (detailedPID.parameterID == '0202') {
           // We might need to manually parse bytes here if queryPID returns raw string
           // For now, assuming queryPID returns the raw bytes or parsed string.
           // Since we set returnType to text, adapter tries to ASCII decode.
@@ -96,14 +96,14 @@ class FreezeFrame {
           // For simplicity, we assume the adapter handles it or returns bytes we parse.
 
           // If we need raw bytes to parse DTC:
-          // value = await _manualDTCParse(adapter, pid);
-          value = await _adapter.queryPID(pid);
+          // value = await _manualDTCParse(adapter, detailedPID);
+          value = await _adapter.queryPID(detailedPID);
         } else {
-          value = await _adapter.queryPID(pid);
+          value = await _adapter.queryPID(detailedPID);
         }
 
         if (value != null) {
-          results[pid] = value;
+          results[detailedPID] = value;
         }
       } catch (error) {
         // Ignore failure for this specific PID and continue to the next one

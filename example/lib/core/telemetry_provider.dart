@@ -10,19 +10,16 @@ class TelemetryProvider extends ChangeNotifier {
   BluetoothAdapterOBD2? scanner;
 
   /// The active streaming session for telemetry data.
-  TelemetrySession? _telemetrySession;
+  TelemetrySession? _activeSession;
 
   /// The currently connected Bluetooth device.
   BluetoothDevice? connectedDevice;
 
-  /// The logic handler for Society of Automotive Engineers (SAE) J1979 standards.
-  final SaeJ1979 _saeJ1979 = SaeJ1979();
-
   /// A timer used to throttle UI updates to prevent main-thread jank.
-  Timer? _uiUpdateTimer;
+  Timer? _UIUpdateTimer;
 
   /// A flag indicating if new data has arrived since the last UI rebuild.
-  bool _needsUpdate = false;
+  bool _requiresUIUpdate = false;
 
   /// Indicates if the application is currently streaming data from the OBD-II adapter.
   bool isStreaming = false;
@@ -77,7 +74,7 @@ class TelemetryProvider extends ChangeNotifier {
       }
 
       await scanner?.disconnect();
-      scanner = BluetoothAdapterOBD2(standard: _saeJ1979);
+      scanner = BluetoothAdapterOBD2();
       await scanner!.connect(device);
       connectedDevice = device;
     } catch (error, stack) {
@@ -95,11 +92,15 @@ class TelemetryProvider extends ChangeNotifier {
   /// provider.startTelemetryStream();
   /// ```
   void startTelemetryStream() {
-    final telemetry = _saeJ1979.telemetry;
+    if (scanner == null) {
+      throw Exception("Scanner is null");
+    }
 
-    _telemetrySession = telemetry.stream(
+    final telemetry = scanner!.protocol.telemetry;
+
+    _activeSession = telemetry.stream(
       adapter: scanner!,
-      pollIntervalMs: 10,
+      pollIntervalMs: 30,
       detailedPIDs: [
         telemetry.rpm,
         telemetry.speed,
@@ -121,47 +122,52 @@ class TelemetryProvider extends ChangeNotifier {
   /// ### Parameters:
   /// - (`TelemetryData`) data: The raw packet received from the [TelemetrySession].
   void _processIncomingTelemetry(TelemetryData data) {
-    final telemetry = _saeJ1979.telemetry;
+    final telemetry = scanner!.protocol.telemetry;
 
     if (data.hasData(telemetry.rpm) == true) {
       engineRpm = data.get(telemetry.rpm);
     }
+
     if (data.hasData(telemetry.speed) == true) {
       vehicleSpeed = data.get(telemetry.speed);
     }
+
     if (data.hasData(telemetry.coolantTemperature) == true) {
       coolantTemperature = data.get(telemetry.coolantTemperature);
     }
+
     if (data.hasData(telemetry.throttlePosition) == true) {
       throttlePosition = data.get(telemetry.throttlePosition);
     }
+
     if (data.hasData(telemetry.engineLoad) == true) {
       engineLoad = data.get(telemetry.engineLoad);
     }
+
     if (data.hasData(telemetry.timingAdvance) == true) {
       timingAdvance = data.get(telemetry.timingAdvance);
     }
 
-    _needsUpdate = true;
+    _requiresUIUpdate = true;
     _runThrottledUpdate();
   }
 
   /// Throttles the [notifyListeners] call to ~30 FPS to maintain UI performance.
   void _runThrottledUpdate() {
-    if (_uiUpdateTimer?.isActive ?? false) return;
+    if (_UIUpdateTimer?.isActive ?? false) return;
 
-    _uiUpdateTimer = Timer(const Duration(milliseconds: 33), () {
-      if (_needsUpdate) {
+    _UIUpdateTimer = Timer(const Duration(milliseconds: 33), () {
+      if (_requiresUIUpdate) {
         notifyListeners();
-        _needsUpdate = false;
+        _requiresUIUpdate = false;
       }
     });
   }
 
   /// Terminates all active OBD-II streams and cancels the UI update timer.
   void stopTelemetryStream() {
-    _telemetrySession?.stop();
-    _uiUpdateTimer?.cancel();
+    _activeSession?.stop();
+    _UIUpdateTimer?.cancel();
     isStreaming = false;
     notifyListeners();
   }
@@ -170,7 +176,7 @@ class TelemetryProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopTelemetryStream();
-    _uiUpdateTimer?.cancel();
+    _UIUpdateTimer?.cancel();
     super.dispose();
   }
 }

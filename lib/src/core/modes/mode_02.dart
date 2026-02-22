@@ -1,24 +1,26 @@
-
-import 'package:obd2/obd2.dart';
-import 'package:obd2/src/core/adapter_obd2.dart';
-import 'package:obd2/src/core/diagnostic_standards/modes_abstract/mode_02.dart';
-import 'package:obd2/src/core/standard_ids.dart';
+import '../../../obd2.dart';
+import '../adapter_series/adapter_obd2.dart';
+import '../standard_ids.dart';
 
 /// SAE J1979 Implementation of Freeze Frame Mode.
-class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
+class FreezeFrame {
 
-  SAEJ1979FreezeFrameMode();
+  final AdapterOBD2 _adapter;
 
-  @override
+  /// Creates a SAE J1979 freeze frame controller.
+  ///
+  /// ### Parameters:
+  /// - (AdapterOBD2): Active adapter instance.
+  FreezeFrame(this._adapter);
+
   final DetailedPID<String> dtcCausingFreeze = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0202',
     'DTC Causing Freeze Frame',
     'A * 256 + B',
-    obd2QueryReturnType: OBD2QueryReturnValue.text, // Parsed specially as DTC
+    obd2QueryReturnType: QueryReturnValue.text, // Parsed specially as DTC
   );
 
-  @override
   final DetailedPID<double> rpm = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '020C',
@@ -26,7 +28,6 @@ class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
     '([0] * 256 + [1]) / 4',
   );
 
-  @override
   final DetailedPID<double> speed = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '020D',
@@ -34,7 +35,6 @@ class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
     '[0]',
   );
 
-  @override
   final DetailedPID<double> coolantTemperature = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0205',
@@ -42,7 +42,6 @@ class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
     '[0] - 40',
   );
 
-  @override
   final DetailedPID<double> engineLoad = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '0204',
@@ -50,7 +49,6 @@ class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
     '[0] * 100 / 255',
   );
 
-  @override
   final DetailedPID<double> intakeManifoldPressure = const DetailedPID(
     DiagnosticStandardIDs.saeJ1979,
     '020B',
@@ -78,8 +76,7 @@ class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
   ///   adapter: myAdapter,
   /// );
   /// ```
-  @override
-  Future<TelemetryData> getFreezeFrameData({ required List<DetailedPID> detailedPIDs,  required AdapterOBD2 adapter }) async {
+  Future<TelemetryData> getFreezeFrameData({ required List<DetailedPID> detailedPIDs }) async {
     final Map<DetailedPID, dynamic> results = {};
 
     for (final DetailedPID pid in detailedPIDs) {
@@ -100,9 +97,9 @@ class SAEJ1979FreezeFrameMode extends FreezeFrameMode {
 
           // If we need raw bytes to parse DTC:
           // value = await _manualDTCParse(adapter, pid);
-          value = await adapter.queryPID(pid);
+          value = await _adapter.queryPID(pid);
         } else {
-          value = await adapter.queryPID(pid);
+          value = await _adapter.queryPID(pid);
         }
 
         if (value != null) {

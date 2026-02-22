@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../adapter_obd2.dart';
+import 'adapter_obd2.dart';
 
 /// BLE = Bluetooth Low Energy
 /// GATT = Generic Attribute Profile
@@ -30,10 +30,7 @@ class BluetoothAdapterOBD2 extends AdapterOBD2 {
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
 
   /// Creates a Bluetooth OBD-II adapter instance.
-  ///
-  /// ### Parameters:
-  /// - [standard] (DiagnosticStandard): The protocol standard (e.g., SAE J1979).
-  BluetoothAdapterOBD2({required super.standard});
+  BluetoothAdapterOBD2();
 
   /// Indicates whether the device is physically connected.
   @override

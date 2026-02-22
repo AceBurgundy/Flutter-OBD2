@@ -1,7 +1,7 @@
 /// Defines the type of data a PID returns.
 ///
 /// This allows the [AdapterOBD2] to decide how to parse the raw bytes.
-enum OBD2QueryReturnValue {
+enum QueryReturnValue {
   /// A single floating point number (e.g., RPM, Speed, Temp).
   /// Parsed using the standard mathematical formula.
   double,

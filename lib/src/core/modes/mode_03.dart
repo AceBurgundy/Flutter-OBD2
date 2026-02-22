@@ -1,12 +1,17 @@
-import 'package:obd2/src/core/diagnostic_standards/modes_abstract/mode_03.dart';
-import 'package:obd2/src/core/standard_ids.dart';
-import 'package:obd2/src/core/adapter_obd2.dart';
-import 'package:obd2/obd2.dart';
+import '../../../obd2.dart';
+import '../adapter_series/adapter_obd2.dart';
+import '../standard_ids.dart';
 
 /// SAE J1979 Implementation of Read Codes Mode.
-class SAEJ1979ReadCodesMode extends ReadCodesMode {
+class ReadCodes {
 
-  SAEJ1979ReadCodesMode();
+  final AdapterOBD2 _adapter;
+
+  /// Creates a SAE J1979 read codes controller.
+  ///
+  /// ### Parameters:
+  /// - (AdapterOBD2): Active adapter instance.
+  ReadCodes(this._adapter);
 
   /// The standard command to request stored codes.
   static const String _commandReadStored = "03";
@@ -16,23 +21,16 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
   /// This method checks the adapter connection, sends the standard Mode 03 request,
   /// and interprets the raw byte response into human-readable DTC strings.
   ///
-  /// ### Parameters:
-  /// - (`AdapterOBD2`): adapter - The connected OBD2 adapter instance.
-  ///
   /// ### Returns:
   /// - (`Future<List<String>>`): A list of formatted DTC strings (e.g., "P0300"). Returns an empty list if no codes are found or if an error occurs.
   ///
   /// ### Usage:
   /// ```dart
-  /// final codes = await mode03.getDiagnosticTroubleCodes(adapter);
+  /// final codes = await mode03.getDiagnosticTroubleCodes();
   /// print(codes); // ['P0100', 'P0200']
   /// ```
-  ///
-  /// ### Throws:
-  /// - (`StateError`): If the adapter is not connected.
-  @override
-  Future<List<String>> getDiagnosticTroubleCodes(AdapterOBD2 adapter) async {
-    if (!adapter.isConnected) {
+  Future<List<String>> getDiagnosticTroubleCodes() async {
+    if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
@@ -45,11 +43,11 @@ class SAEJ1979ReadCodesMode extends ReadCodesMode {
         _commandReadStored,
         'Read Stored DTCs',
         '', // No formula, custom parsing
-        obd2QueryReturnType: OBD2QueryReturnValue.status, // Return raw bytes
+        obd2QueryReturnType: QueryReturnValue.status, // Return raw bytes
       );
 
       // This query returns List<int> (raw bytes) because of .status type
-      final dynamic rawResponse = await adapter.queryPID(requestDetailedPID);
+      final dynamic rawResponse = await _adapter.queryPID(requestDetailedPID);
 
       if (rawResponse is List<int>) {
         return _decodeDTCs(rawResponse);

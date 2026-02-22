@@ -1,28 +1,86 @@
 import 'dart:async';
 
-import '../../../../enums.dart';
-import '../../../../models.dart';
-import '../../../adapter_obd2.dart';
-import '../../../standard_ids.dart';
-import '../../modes_abstract/mode_01.dart';
-
+import '../../../obd2.dart';
+import '../adapter_series/adapter_obd2.dart';
+import '../standard_ids.dart';
 
 /// SAE = Society of Automotive Engineers
 /// PID = Parameter Identifier
 /// ECU = Engine Control Unit
 /// AFR = Air Fuel Ratio
 /// DTC = Diagnostic Trouble Code
+
+
+/// Represents an active telemetry polling session.
 ///
+/// A session manages:
+/// - Recursive ECU polling
+/// - Safe cancellation
+class TelemetrySession {
+  /// The callback function executed when [stop] is called.
+  /// This is used to flip the internal `isRunning` flag in the loop.
+  final void Function() _onStop;
+
+  /// Creates a telemetry session with a cancellation callback.
+  TelemetrySession(this._onStop);
+
+  /// Stops the telemetry session and releases resources.
+  void stop() {
+    _onStop();
+  }
+}
+
+/// A type-safe container for telemetry data.
+///
+/// Instead of a raw Map, this class uses generics to ensure that
+/// retrieving a value matches the type defined in the PID.
+class TelemetryData {
+  /// The internal storage of values.
+  final Map<DetailedPID, dynamic> _values;
+
+  /// The timestamp of this data snapshot.
+  final DateTime timestamp;
+
+  TelemetryData(this._values, {DateTime? timestamp})
+      : timestamp = timestamp ?? DateTime.now();
+
+  /// Retrieves a type-safe value for the given PID.
+  ///
+  /// This method uses the generic type [T] from the [pid] to ensure
+  /// the return type matches the PID's definition.
+  ///
+  /// ### Parameters:
+  /// - [detailedPID] (`DetailedPID<T>`): The PID to retrieve.
+  ///
+  /// ### Returns:
+  /// - (T?): The value cast to type [T], or null if not present.
+  ///
+  /// ### Usage:
+  /// ```dart
+  /// double? rpm = data.get(rpmPID); // OK
+  /// double? fuel = data.get(fuelStringPID); // COMPILE ERROR
+  /// ```
+  T? get<T>(DetailedPID<T> detailedPID) {
+    return _values[detailedPID] as T?;
+  }
+
+  /// Helper to check if data exists.
+  bool hasData(DetailedPID pid) => _values.containsKey(pid);
+}
+
 /// SAE J1979 Mode 01 telemetry implementation.
 ///
 /// Provides access to standard live powertrain telemetry
 /// defined by the SAE J1979 specification.
-class SAEJ1979ModeTelemetry extends TelemetryMode {
+class Telemetry {
+
+  final AdapterOBD2 _adapter;
+
   /// Creates a SAE J1979 telemetry controller.
   ///
   /// ### Parameters:
   /// - (AdapterOBD2): Active adapter instance.
-  SAEJ1979ModeTelemetry();
+  Telemetry(this._adapter);
 
   /// OBD-II service mode for live powertrain data.
   static const String mode = '01';
@@ -119,7 +177,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     "0124",
     "Lambda (Bank 1, Sensor 1)",
     "(256 * A + B) / 32768",
-    obd2QueryReturnType: OBD2QueryReturnValue.composite,
+    obd2QueryReturnType: QueryReturnValue.composite,
   );
 
   final DetailedPID<double> barometricPressure = const DetailedPID(
@@ -164,7 +222,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
     '0151',
     'Fuel Type',
     '[0]',
-    obd2QueryReturnType: OBD2QueryReturnValue.text,
+    obd2QueryReturnType: QueryReturnValue.text,
     bestPollingIntervalMs: 60000
   );
 
@@ -241,7 +299,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   ///
   /// ### Usage:
   /// ```dart
-  /// double newOdo = await SAEJ1979ModeTelemetry.calculateOdometer(
+  /// double newOdo = await Telemetry.calculateOdometer(
   ///   currentOdometer: vehicle.odometer,
   ///   currentSpeedKmh: gpsSpeed,
   ///   lastUpdateTime: lastTickTime,
@@ -294,7 +352,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   /// by actively querying each supported PID.
   ///
   /// ### Parameters:
-  /// - [adapter] (AdapterOBD2): A connected and initialized adapter.
   /// - [validateAccessibility] (bool): If `true`, each PID is actively queried
   ///   to ensure it responds with valid data. Defaults to `false`.
   ///
@@ -310,12 +367,11 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   /// ### Usage:
   /// ```dart
   /// final supportedPIDs = await sae.detectSupportedTelemetry(
-  ///   adapter: adapter,
   ///   validateAccessibility: true,
   /// );
   /// ```
-  Future<List<String>> detectSupportedTelemetry({  required AdapterOBD2 adapter,  bool validateAccessibility = false }) async {
-    if (!adapter.isConnected) {
+  Future<List<String>> detectSupportedTelemetry({ bool validateAccessibility = false }) async {
+    if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
@@ -328,21 +384,21 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
         '0100',
         'Supported PIDs 01–20',
         '',
-        obd2QueryReturnType: OBD2QueryReturnValue.status,
+        obd2QueryReturnType: QueryReturnValue.status,
       ),
       const DetailedPID(
         DiagnosticStandardIDs.saeJ1979,
         '0120',
         'Supported PIDs 21–40',
         '',
-        obd2QueryReturnType: OBD2QueryReturnValue.status,
+        obd2QueryReturnType: QueryReturnValue.status,
       ),
       const DetailedPID(
         DiagnosticStandardIDs.saeJ1979,
         '0140',
         'Supported PIDs 41–60',
         '',
-        obd2QueryReturnType: OBD2QueryReturnValue.status,
+        obd2QueryReturnType: QueryReturnValue.status,
       ),
     ];
 
@@ -350,7 +406,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
       // Bitmask Discovery
       // Checks for all accessible pids including manufacturer-restricted ones
       for (final DetailedPID capabilityPID in capabilityPIDs) {
-        final List<int>? bitmask = await adapter.queryPID(capabilityPID) as List<int>?;
+        final List<int>? bitmask = await _adapter.queryPID(capabilityPID) as List<int>?;
         if (bitmask == null || bitmask.length < 4) continue;
 
         final int basePID = int.parse(capabilityPID.parameterID.substring(2), radix: 16);
@@ -385,7 +441,7 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
           if (!supportedParameterIDs.contains(detailedPID.parameterID)) continue;
 
           try {
-            final dynamic value = await adapter.queryPID(detailedPID);
+            final dynamic value = await _adapter.queryPID(detailedPID);
             if (value != null) validatedParameterIDs.add(detailedPID.parameterID);
           } catch (error) {
             // If validation fails for a specific PID, ignore it and continue
@@ -428,7 +484,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   ///
   /// ### Throws:
   /// - (StateError): Thrown if the adapter is not connected when the stream starts.
-  @override
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
@@ -529,7 +584,6 @@ class SAEJ1979ModeTelemetry extends TelemetryMode {
   /// ### Throws:
   /// - [Exception]: Rethrows any communication errors encountered
   ///   during the query process.
-  @override
   Future<Map<DetailedPID, dynamic>> query({
     required List<DetailedPID> detailedPIDs,
     required AdapterOBD2 adapter,

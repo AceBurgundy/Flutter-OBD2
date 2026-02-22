@@ -11,7 +11,7 @@ class DetailedPID<T> {
   final String parameterID;
   final String name;
   final String formula;
-  final OBD2QueryReturnValue obd2QueryReturnType;
+  final QueryReturnValue obd2QueryReturnType;
 
   /// The suggested polling interval in milliseconds.
   ///
@@ -28,7 +28,7 @@ class DetailedPID<T> {
     this.parameterID,
     this.name,
     this.formula, {
-    this.obd2QueryReturnType = OBD2QueryReturnValue.double,
+    this.obd2QueryReturnType = QueryReturnValue.double,
     this.bestPollingIntervalMs = 250,
   });
 

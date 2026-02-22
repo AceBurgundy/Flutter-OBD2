@@ -1,13 +1,17 @@
-import 'package:obd2/obd2.dart';
-import 'package:obd2/src/core/adapter_obd2.dart';
-import 'package:obd2/src/core/diagnostic_standards/modes_abstract/mode_04.dart';
-import 'package:obd2/src/core/standard_ids.dart';
+import '../../../obd2.dart';
+import '../adapter_series/adapter_obd2.dart';
+import '../standard_ids.dart';
 
 /// SAE J1979 Implementation of Clear Codes Mode.
-class SAEJ1979ClearCodesMode extends ClearCodesMode {
+class ClearCodes {
 
-  /// Creates an instance of the SAE J1979 Clear Codes Mode.
-  SAEJ1979ClearCodesMode();
+  final AdapterOBD2 _adapter;
+
+  /// Creates a SAE J1979 clear codes controller.
+  ///
+  /// ### Parameters:
+  /// - (AdapterOBD2): Active adapter instance.
+  ClearCodes(this._adapter);
 
   /// The command string to clear DTCs.
   static const String _commandClearDTCs = "04";
@@ -17,25 +21,18 @@ class SAEJ1979ClearCodesMode extends ClearCodesMode {
   /// This method sends the standard Mode 04 command to the vehicle's ECU.
   /// This action typically erases stored trouble codes and freeze frame data.
   ///
-  /// ### Parameters:
-  /// - (`AdapterOBD2`): adapter - The connected OBD2 adapter instance.
-  ///
   /// ### Returns:
   /// - (`Future<bool>`): Returns `true` if the ECU responds positively (e.g., "44" or "OK"), otherwise `false`.
   ///
   /// ### Usage:
   /// ```dart
-  /// final success = await mode04.clearDiagnosticTroubleCodes(adapter);
+  /// final success = await mode04.clearDiagnosticTroubleCodes();
   /// if (success) {
   ///   print('Codes cleared successfully.');
   /// }
   /// ```
-  ///
-  /// ### Throws:
-  /// - (`StateError`): If the adapter is not connected.
-  @override
-  Future<bool> clearDiagnosticTroubleCodes(AdapterOBD2 adapter) async {
-    if (!adapter.isConnected) {
+  Future<bool> clearDiagnosticTroubleCodes() async {
+    if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
@@ -47,13 +44,13 @@ class SAEJ1979ClearCodesMode extends ClearCodesMode {
         _commandClearDTCs,
         'Clear DTCs',
         '',
-        obd2QueryReturnType: OBD2QueryReturnValue.text,
+        obd2QueryReturnType: QueryReturnValue.text,
       );
 
       // Sending "04"
       // Note: The adapter might interpret "04" as a PID if using buildDetailedPIDRequest.
       // Ideally, the adapter should have a raw sendCommand method, but we reuse queryPID here.
-      final dynamic response = await adapter.queryPID(clearDetailedPID);
+      final dynamic response = await _adapter.queryPID(clearDetailedPID);
 
       // Check success
       // ELM327 positive response to "04" is usually "44"

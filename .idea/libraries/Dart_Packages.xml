@@ -151,7 +151,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/code_assets-0.19.7/lib" />
-              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/code_assets-1.0.0/lib" />
             </list>
           </value>
         </entry>
@@ -332,8 +331,7 @@
         <entry key="flutter">
           <value>
             <list>
-              <option value="$PROJECT_DIR$/../../fvm/default/packages/flutter/lib" />
-              <option value="$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/packages/flutter/lib" />
+              <option value="$PROJECT_DIR$/../../installation/packages/flutter/lib" />
             </list>
           </value>
         </entry>
@@ -385,7 +383,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_winrt-0.0.12/lib" />
-              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_winrt-0.0.16/lib" />
               <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_winrt-0.0.18/lib" />
             </list>
           </value>
@@ -414,16 +411,14 @@
         <entry key="flutter_test">
           <value>
             <list>
-              <option value="$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/packages/flutter_test/lib" />
-              <option value="$PROJECT_DIR$/../../fvm/default/packages/flutter_test/lib" />
+              <option value="$PROJECT_DIR$/../../installation/packages/flutter_test/lib" />
             </list>
           </value>
         </entry>
         <entry key="flutter_web_plugins">
           <value>
             <list>
-              <option value="$PROJECT_DIR$/../../fvm/default/packages/flutter_web_plugins/lib" />
-              <option value="$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/packages/flutter_web_plugins/lib" />
+              <option value="$PROJECT_DIR$/../../installation/packages/flutter_web_plugins/lib" />
             </list>
           </value>
         </entry>
@@ -536,7 +531,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-0.20.1/lib" />
-              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-1.0.1/lib" />
             </list>
           </value>
         </entry>
@@ -705,13 +699,6 @@
             </list>
           </value>
         </entry>
-        <entry key="native_toolchain_c">
-          <value>
-            <list>
-              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/native_toolchain_c-0.17.4/lib" />
-            </list>
-          </value>
-        </entry>
         <entry key="nested">
           <value>
             <list>
@@ -723,13 +710,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/node_preamble-2.0.2/lib" />
-            </list>
-          </value>
-        </entry>
-        <entry key="objective_c">
-          <value>
-            <list>
-              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/objective_c-9.3.0/lib" />
             </list>
           </value>
         </entry>
@@ -786,7 +766,6 @@
           <value>
             <list>
               <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_foundation-2.5.1/lib" />
-              <option value="$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_foundation-2.6.0/lib" />
             </list>
           </value>
         </entry>
@@ -971,8 +950,7 @@
         <entry key="sky_engine">
           <value>
             <list>
-              <option value="$PROJECT_DIR$/../../fvm/default/bin/cache/pkg/sky_engine/lib" />
-              <option value="$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/bin/cache/pkg/sky_engine/lib" />
+              <option value="$PROJECT_DIR$/../../installation/bin/cache/pkg/sky_engine/lib" />
             </list>
           </value>
         </entry>
@@ -1292,7 +1270,6 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/cli_config-0.2.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/clock-1.1.2/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/code_assets-0.19.7/lib" />
-      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/code_assets-1.0.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/code_builder-4.11.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/code_builder-4.11.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/collection-1.19.1/lib" />
@@ -1332,7 +1309,6 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_platform_interface-8.1.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_web-8.1.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_winrt-0.0.12/lib" />
-      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_winrt-0.0.16/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_blue_plus_winrt-0.0.18/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lints-6.0.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_svg-2.2.3/lib" />
@@ -1353,7 +1329,6 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hive_flutter-1.1.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hive_generator-2.0.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-0.20.1/lib" />
-      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-1.0.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/hooks_runner-0.23.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/html-0.15.6/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/http-1.5.0/lib" />
@@ -1381,10 +1356,8 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/multicast_dns-0.3.3/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/mustache_template-2.0.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/native_stack_traces-0.6.1/lib" />
-      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/native_toolchain_c-0.17.4/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/nested-1.0.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/node_preamble-2.0.2/lib" />
-      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/objective_c-9.3.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/package_config-2.2.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/package_info_plus-9.0.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/package_info_plus_platform_interface-3.2.1/lib" />
@@ -1393,7 +1366,6 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider-2.1.5/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.2.22/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_foundation-2.5.1/lib" />
-      <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_foundation-2.6.0/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_linux-2.2.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_platform_interface-2.1.2/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_windows-2.3.0/lib" />
@@ -1469,14 +1441,10 @@
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/xml-6.6.1/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/yaml-3.1.3/lib" />
       <root url="file://$USER_HOME$/AppData/Local/Pub/Cache/hosted/pub.dev/yaml_edit-2.2.2/lib" />
-      <root url="file://$PROJECT_DIR$/../../fvm/default/bin/cache/pkg/sky_engine/lib" />
-      <root url="file://$PROJECT_DIR$/../../fvm/default/packages/flutter/lib" />
-      <root url="file://$PROJECT_DIR$/../../fvm/default/packages/flutter_test/lib" />
-      <root url="file://$PROJECT_DIR$/../../fvm/default/packages/flutter_web_plugins/lib" />
-      <root url="file://$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/bin/cache/pkg/sky_engine/lib" />
-      <root url="file://$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/packages/flutter/lib" />
-      <root url="file://$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/packages/flutter_test/lib" />
-      <root url="file://$PROJECT_DIR$/../care_pulse/.fvm/versions/3.38.1/packages/flutter_web_plugins/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/bin/cache/pkg/sky_engine/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/packages/flutter/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/packages/flutter_test/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/packages/flutter_web_plugins/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

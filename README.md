@@ -113,6 +113,7 @@ final session = telemetry.stream(
   ],
   onData: (TelemetryData data) {
     final rpm = data.get(telemetry.rpm);
+
     if (rpm != null) {
       print("RPM: $rpm");
     }
@@ -135,8 +136,7 @@ session.stop();
 Detect real ECU support:
 
 ```dart
-final supported = await adapter.protocol.telemetry
-    .detectSupportedTelemetry(validateAccessibility: true);
+final supported = await adapter.protocol.telemetry.detectSupportedTelemetry(validateAccessibility: true);
 
 print("Supported PIDs: $supported");
 ```
@@ -159,8 +159,7 @@ print(snapshot.get(freeze.rpm));
 # 🚨 Mode 03 — Read Diagnostic Trouble Codes
 
 ```dart
-final codes =
-    await adapter.protocol.readCodes.getDiagnosticTroubleCodes();
+final codes = await adapter.protocol.readCodes.getDiagnosticTroubleCodes();
 
 print("Fault Codes: $codes");
 ```
@@ -168,8 +167,7 @@ print("Fault Codes: $codes");
 # 🧹 Mode 04 — Clear Diagnostic Trouble Codes
 
 ```dart
-final success =
-    await adapter.protocol.clearCodes.clearDiagnosticTroubleCodes();
+final success = await adapter.protocol.clearCodes.clearDiagnosticTroubleCodes();
 
 print("Cleared: $success");
 ```

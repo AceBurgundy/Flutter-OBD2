@@ -16,7 +16,7 @@ class TelemetryProvider extends ChangeNotifier {
   BluetoothDevice? connectedDevice;
 
   /// A timer used to throttle UI updates to prevent main-thread jank.
-  Timer? _UIUpdateTimer;
+  Timer? _displayUpdateTimer;
 
   /// A flag indicating if new data has arrived since the last UI rebuild.
   bool _requiresUIUpdate = false;
@@ -154,9 +154,9 @@ class TelemetryProvider extends ChangeNotifier {
 
   /// Throttles the [notifyListeners] call to ~30 FPS to maintain UI performance.
   void _runThrottledUpdate() {
-    if (_UIUpdateTimer?.isActive ?? false) return;
+    if (_displayUpdateTimer?.isActive ?? false) return;
 
-    _UIUpdateTimer = Timer(const Duration(milliseconds: 33), () {
+    _displayUpdateTimer = Timer(const Duration(milliseconds: 33), () {
       if (_requiresUIUpdate) {
         notifyListeners();
         _requiresUIUpdate = false;
@@ -167,7 +167,7 @@ class TelemetryProvider extends ChangeNotifier {
   /// Terminates all active OBD-II streams and cancels the UI update timer.
   void stopTelemetryStream() {
     _activeSession?.stop();
-    _UIUpdateTimer?.cancel();
+    _displayUpdateTimer?.cancel();
     isStreaming = false;
     notifyListeners();
   }
@@ -176,7 +176,7 @@ class TelemetryProvider extends ChangeNotifier {
   @override
   void dispose() {
     stopTelemetryStream();
-    _UIUpdateTimer?.cancel();
+    _displayUpdateTimer?.cancel();
     super.dispose();
   }
 }

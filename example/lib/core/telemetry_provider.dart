@@ -99,7 +99,6 @@ class TelemetryProvider extends ChangeNotifier {
     final telemetry = scanner!.protocol.telemetry;
 
     _activeSession = telemetry.stream(
-      adapter: scanner!,
       pollIntervalMs: 30,
       detailedPIDs: [
         telemetry.rpm,

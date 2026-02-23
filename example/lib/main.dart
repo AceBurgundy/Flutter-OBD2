@@ -37,20 +37,20 @@ class SampleApp extends StatelessWidget {
   }
 }
 
-enum ValueType { percent, temperature, speed }
+enum ValueType { percent, temperature }
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   // Fixed widths for the columns
-  static const double columnWidth = 160.0;
+  static const double columnWidth = 170.0;
   static const double spacingHeight = 40.0;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TelemetryProvider>();
 
-    Widget telemetryItem(String label, double? value, {ValueType? type = ValueType.percent}) {
+    Widget telemetryItem(String label, double? value, { ValueType? type }) {
       final displayValue = (value ?? 0).toStringAsFixed(0);
       String finalType = "";
 
@@ -61,9 +61,6 @@ class DashboardPage extends StatelessWidget {
             break;
           case ValueType.percent:
             finalType = "%";
-            break;
-          case ValueType.speed:
-            finalType = "kmh";
             break;
         }
       }
@@ -78,7 +75,7 @@ class DashboardPage extends StatelessWidget {
               Text(
                 displayValue,
                 style: const TextStyle(
-                  fontSize: 55,
+                  fontSize: 75,
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   height: 1,
@@ -88,7 +85,7 @@ class DashboardPage extends StatelessWidget {
               const SizedBox(width: 3),
               Text(
                 finalType,
-                style: const TextStyle(fontSize: 15, color: Colors.white70, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 15, color: Colors.white70),
               ),
             ],
           ),
@@ -161,8 +158,8 @@ class DashboardPage extends StatelessWidget {
                 children: [
                   TableRow(
                     children: [
+                      telemetryItem("Speed (KPH)", provider.vehicleSpeed),
                       telemetryItem("RPM", provider.engineRpm),
-                      telemetryItem("Speed", provider.vehicleSpeed, type: ValueType.speed),
                       telemetryItem("Coolant", provider.coolantTemperature, type: ValueType.temperature),
                     ],
                   ),

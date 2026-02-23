@@ -8,8 +8,22 @@ issue_tracker: https://github.com/AceBurgundy/Flutter-OBD2/issues
 # License identifier (must match LICENSE file in repository).
 license: MPL-2.0
 
+# Improve discoverability
+topics:
+  - obd
+  - obd2
+  - automotive
+  - canbus
+  - telemetry
+  - bluetooth
+  - elm327
+
+# Explicit platform declaration
+platforms:
+  android:
+  
 # Dart SDK constraints.
-# Coompatibility with all Dart 3 versions.
+# Compatibility with all Dart 3 versions.
 environment:
   sdk: ">=3.0.0 <4.0.0"
 
@@ -34,3 +48,4 @@ dev_dependencies:
 
   # Unit testing framework.
   test: ^1.25.6
+

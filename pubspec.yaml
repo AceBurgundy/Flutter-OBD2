@@ -1,21 +1,36 @@
 name: obd2
-description:  Flutter OBD2 package for ELM327 & NexLink. Cross-platform (iOS/Android) BLE support and Desktop Support. Real-time telemetry, DTC parsing, & custom PID formulas. The official source for the 'obd2' package on pub.dev.
-version: 1.0.0
+description: A production-ready SAE J1979 OBD-II SDK for Flutter with BLE support for ELM327-compatible adapters. Provides real-time telemetry, DTC parsing, and type-safe PID handling.
+version: 0.9.0
 repository: https://github.com/AceBurgundy/Flutter-OBD2
+homepage: https://github.com/AceBurgundy/Flutter-OBD2
+issue_tracker: https://github.com/AceBurgundy/Flutter-OBD2/issues
 
+# License identifier (must match LICENSE file in repository).
+license: MPL-2.0
+
+# Dart SDK constraints.
+# Coompatibility with all Dart 3 versions.
 environment:
-  sdk: ^3.10.0
+  sdk: ">=3.0.0 <4.0.0"
 
-# Add regular dependencies here.
+# Package dependencies.
 dependencies:
 
+  # This package depends on Flutter plugins (BLE).
   flutter:
     sdk: flutter
 
+  # Bluetooth Low Energy library used for ELM327 communication.
   flutter_blue_plus: ^2.1.0
-  math_expressions: ^3.1.0
-  path_provider: ^2.1.5
 
+  # Used for dynamic PID formula evaluation.
+  math_expressions: ^3.1.0
+
+# Development-only dependencies.
 dev_dependencies:
+
+  # Recommended lint rules for modern Dart/Flutter packages.
   lints: ^6.0.0
+
+  # Unit testing framework.
   test: ^1.25.6

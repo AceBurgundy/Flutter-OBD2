@@ -1,13 +1,24 @@
 # 🚗 Flutter OBD2
 
 [![Flutter CI](https://github.com/AceBurgundy/Flutter-OBD2/actions/workflows/flutter_ci.yml/badge.svg)](https://github.com/AceBurgundy/Flutter-OBD2/actions/workflows/flutter_ci.yml)
+[![pub version](https://img.shields.io/pub/v/obd2.svg)](https://pub.dev/packages/obd2)
 
 A **modern SAE J1979 OBD-II SDK for Flutter**.
 
-Flutter OBD2 provides a clean, type-safe, and transport-focused interface for communicating with **ELM327-compatible Bluetooth Low Energy (BLE)** adapters using the **SAE J1979 (Generic OBD-II)** standard.
+Flutter OBD2 provides a clean, type-safe, and transport-separated architecture for communicating with **ELM327-compatible Bluetooth Low Energy (BLE)** adapters using the **SAE J1979 (Generic OBD-II)** standard.
 
 > ⚙️ This SDK intentionally supports **SAE J1979 only**.  
 > It does **not** implement UDS or manufacturer-specific diagnostic protocols.
+
+## 📱 Platform Support
+
+| Platform | Status |
+|----------|--------|
+| Android  | ✅ Supported |
+| iOS      | ⚠️ Untested |
+| macOS    | ❌ Not Supported |
+| Windows  | ⚠️ Untested |
+| Web      | ❌ Not Supported |
 
 ## 📦 Current Release Status
 
@@ -22,7 +33,7 @@ Flutter OBD2 provides a clean, type-safe, and transport-focused interface for co
 
 ![Telemetry Dashboard](screenshots/dashboard.jpg)
 
-# ✨ Why Flutter OBD2?
+## ✨ Why Flutter OBD2?
 
 Most OBD libraries:
 
@@ -42,7 +53,7 @@ Flutter OBD2 provides:
 
 This is a **diagnostic SDK**, not just a Bluetooth wrapper.
 
-# 🏗 Architecture Overview
+## 🏗 Architecture Overview
 
 ```
 BluetoothAdapterOBD2  (BLE Transport)
@@ -85,9 +96,15 @@ Provides:
 - Byte extraction logic
 - Diagnostic parsing rules
 
-# 🚀 Getting Started
+## 🚀 Getting Started
 
-## 1️⃣ Installation
+### 🧰 Requirements
+
+- Flutter 3.x
+- Dart 3.x
+- ELM327-compatible BLE adapter (NexLink BLE adapters are recommended)
+  
+### 1️⃣ Installation
 
 ```yaml
 dependencies:
@@ -95,7 +112,7 @@ dependencies:
   flutter_blue_plus: ^2.1.0
 ```
 
-## 2️⃣ Connect to Adapter
+### 2️⃣ Connect to Adapter
 
 ```dart
 import 'package:obd2/obd2.dart';
@@ -117,7 +134,7 @@ The adapter automatically:
 
 No protocol injection required.
 
-# 📡 Mode 01 — Live Telemetry (Production Ready)
+## 📡 Mode 01 — Live Telemetry (Production Ready)
 
 ```dart
 final telemetry = adapter.protocol.telemetry;
@@ -141,15 +158,15 @@ final session = telemetry.stream(
 session.stop();
 ```
 
-### Telemetry Engine Features
+## Telemetry Engine Features
 
 - Respects `bestPollingIntervalMs`
 - Prevents ECU flooding
 - Collision-safe recursive loop
 - Type-safe PID retrieval
-- Timeout resilient
+- Timeout-resilient command handling
 
-# 🔍 Supported PID Discovery
+## 🔍 Supported PID Discovery
 
 ```dart
 final supported = await adapter.protocol.telemetry
@@ -158,7 +175,7 @@ final supported = await adapter.protocol.telemetry
 print("Supported: $supported");
 ```
 
-# 🧊 Mode 02 — Freeze Frame
+## 🧊 Mode 02 — Freeze Frame
 
 ```dart
 final freeze = adapter.protocol.freezeFrame;
@@ -173,7 +190,7 @@ final snapshot = await freeze.getFrameData(
 print(snapshot.get(freeze.rpm));
 ```
 
-# 🚨 Mode 03 — Read Diagnostic Trouble Codes
+## 🚨 Mode 03 — Read Diagnostic Trouble Codes
 
 ```dart
 final codes = await adapter.protocol.readCodes.getDTCs();
@@ -181,7 +198,7 @@ final codes = await adapter.protocol.readCodes.getDTCs();
 print("Fault Codes: $codes");
 ```
 
-# 🧹 Mode 04 — Clear Diagnostic Trouble Codes
+## 🧹 Mode 04 — Clear Diagnostic Trouble Codes
 
 ```dart
 final success = await adapter.protocol.clearCodes.eraseDTCs();
@@ -189,7 +206,7 @@ final success = await adapter.protocol.clearCodes.eraseDTCs();
 print("Cleared: $success");
 ```
 
-# 🧬 Type-Safe PID System
+## 🧬 Type-Safe PID System
 
 Each PID is defined as:
 
@@ -208,7 +225,7 @@ Compile-time enforced return types:
 
 No manual casting required.
 
-# 🔌 BLE Compatibility Strategy
+## 🔌 BLE Compatibility Strategy
 
 `BluetoothAdapterOBD2` uses a **Greedy Discovery Model**:
 
@@ -220,7 +237,7 @@ No manual casting required.
 
 Designed for low-cost ELM327 clones.
 
-# 🧠 Public API Overview
+## 🧠 Public API Overview
 
 ## Core
 
@@ -238,14 +255,26 @@ adapter.protocol.readCodes
 adapter.protocol.clearCodes
 ```
 
-# 🧪 Testing & CI
+## 🧪 Testing & CI
 
 - Full unit tests
 - `dart analyze` enforced
 - GitHub Actions CI
 - Mock adapter testing (no hardware required)
 
-# ⚠️ Testing Status
+## ❌ What This Package Is Not
+
+Flutter OBD2 does not:
+
+- Flash ECUs
+- Remap fuel maps
+- Modify odometers
+- Access manufacturer-specific modules
+- Implement UDS or ISO 14229
+
+This package strictly implements the SAE J1979 emissions diagnostic standard.
+
+## ⚠️ Testing Status
 
 | Mode    | Validation Level |
 |----------|------------------|
@@ -256,7 +285,7 @@ adapter.protocol.clearCodes
 
 Full real-world validation targeted for v1.0.0.
 
-# 🎯 Road to 1.0
+## 🎯 Road to 1.0
 
 Version 1.0.0 will signify:
 
@@ -264,7 +293,7 @@ Version 1.0.0 will signify:
 - Stable API commitment
 - Production-grade diagnostic reliability
 
-# 🧭 Design Philosophy
+## 🧭 Design Philosophy
 
 Flutter OBD2:
 
@@ -274,6 +303,6 @@ Flutter OBD2:
 - Prioritizes clarity over feature bloat
 - Is engineered for long-term stability
 
-# 📄 License
+## 📄 License
 
 Licensed under the **Mozilla Public License 2.0**.

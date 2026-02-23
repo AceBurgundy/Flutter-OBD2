@@ -46,7 +46,7 @@ dependencies:
   path_provider: ^2.1.5
 
   obd2:
-    path: D:/Documents/Programming/Frameworks/Flutter/projects/obd2
+    path: ../
 
 dev_dependencies:
   flutter_test:

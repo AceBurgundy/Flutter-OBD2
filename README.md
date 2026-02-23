@@ -7,6 +7,10 @@ Flutter OBD2 provides a clean, type-safe, and transport-agnostic interface for c
 > ⚙️ This SDK is intentionally focused on **SAE J1979 only**.
 > It does **not** implement UDS or manufacturer-specific protocols.
 
+## 📊 Example Dashboard
+
+![Telemetry Dashboard](screenshots/dashboard.jpg)
+
 ## ✨ Why This Package?
 
 Most OBD libraries:

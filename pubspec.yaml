@@ -21,7 +21,12 @@ topics:
 # Explicit platform declaration
 platforms:
   android:
-  
+
+# Some sample screenshots to show off the package's capabilities.
+screenshots:
+  - description: 'A live view of the package being used'
+    path: screenshots/dashboard.jpg
+
 # Dart SDK constraints.
 # Compatibility with all Dart 3 versions.
 environment:

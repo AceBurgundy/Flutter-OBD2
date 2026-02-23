@@ -1,6 +1,6 @@
 # 🚗 Flutter OBD2
 
-[![CI](https://github.com/AceBurgundy/Flutter-OBD2/actions/workflows/flutter.yml/badge.svg)](https://github.com/AceBurgundy/Flutter-OBD2/actions)
+[![Flutter CI](https://github.com/AceBurgundy/Flutter-OBD2/actions/workflows/flutter_ci.yml/badge.svg)](https://github.com/AceBurgundy/Flutter-OBD2/actions/workflows/flutter_ci.yml)
 
 A **modern SAE J1979 OBD-II SDK for Flutter**.
 

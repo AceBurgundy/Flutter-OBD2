@@ -43,15 +43,45 @@ class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
 
   // Fixed widths for the columns
-  static const double columnWidth = 170.0;
+  static const double columnWidth = 220.0;
   static const double spacingHeight = 40.0;
+
+  /// Formats an integer with thousands separators (commas).
+  ///
+  /// Converts a numeric value like:
+  /// ```
+  /// 13444  ->  13,444
+  /// 100000 ->  100,000
+  /// 999    ->  999
+  /// ```
+  ///
+  /// This method does **not** rely on external packages (e.g., `intl`)
+  /// and uses a regular expression to insert commas every three digits,
+  /// starting from the right side of the number.
+  ///
+  /// Intended for UI display purposes such as formatting RPM values.
+  ///
+  /// Example:
+  /// ```dart
+  /// final formatted = _formatWithCommas(13444);
+  /// print(formatted); // 13,444
+  /// ```
+  ///
+  /// Returns the formatted string representation of [value].
+  String _formatWithCommas(int value) {
+    final stringValue = value.toString();
+    return stringValue.replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<TelemetryProvider>();
 
     Widget telemetryItem(String label, double? value, { ValueType? type }) {
-      final displayValue = (value ?? 0).toStringAsFixed(0);
+      final displayValue = _formatWithCommas((value ?? 0).round());
       String finalType = "";
 
       if (type != null) {
@@ -75,10 +105,11 @@ class DashboardPage extends StatelessWidget {
               Text(
                 displayValue,
                 style: const TextStyle(
-                  fontSize: 75,
+                  fontSize: 55,
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   height: 1,
+                  letterSpacing: 2,
                   fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),

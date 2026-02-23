@@ -10,10 +10,8 @@ license: MPL-2.0
 
 # Improve discoverability
 topics:
-  - obd
   - obd2
   - automotive
-  - canbus
   - telemetry
   - bluetooth
   - elm327

@@ -37,7 +37,7 @@ class SampleApp extends StatelessWidget {
   }
 }
 
-enum ValueType { percent, temperature }
+enum ValueType { percent, temperature, speed }
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -50,9 +50,23 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<TelemetryProvider>();
 
-    Widget telemetryItem(String label, double? value, {ValueType type = ValueType.percent}) {
+    Widget telemetryItem(String label, double? value, {ValueType? type = ValueType.percent}) {
       final displayValue = (value ?? 0).toStringAsFixed(0);
-      final unit = type == ValueType.temperature ? "°C" : "%";
+      String finalType = "";
+
+      if (type != null) {
+        switch (type) {
+          case ValueType.temperature:
+            finalType = "°C";
+            break;
+          case ValueType.percent:
+            finalType = "%";
+            break;
+          case ValueType.speed:
+            finalType = "kmh";
+            break;
+        }
+      }
 
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -73,7 +87,7 @@ class DashboardPage extends StatelessWidget {
               ),
               const SizedBox(width: 3),
               Text(
-                unit,
+                finalType,
                 style: const TextStyle(fontSize: 15, color: Colors.white70, fontWeight: FontWeight.bold),
               ),
             ],
@@ -148,7 +162,7 @@ class DashboardPage extends StatelessWidget {
                   TableRow(
                     children: [
                       telemetryItem("RPM", provider.engineRpm),
-                      telemetryItem("Speed", provider.vehicleSpeed),
+                      telemetryItem("Speed", provider.vehicleSpeed, type: ValueType.speed),
                       telemetryItem("Coolant", provider.coolantTemperature, type: ValueType.temperature),
                     ],
                   ),
@@ -162,9 +176,9 @@ class DashboardPage extends StatelessWidget {
                   ),
                   TableRow(
                     children: [
-                      telemetryItem("Throttle", provider.throttlePosition),
-                      telemetryItem("Load", provider.engineLoad),
-                      telemetryItem("Timing", provider.timingAdvance),
+                      telemetryItem("Throttle", provider.throttlePosition, type: ValueType.percent),
+                      telemetryItem("Load", provider.engineLoad, type: ValueType.percent),
+                      telemetryItem("Timing", provider.timingAdvance, type: ValueType.percent),
                     ],
                   ),
                 ],

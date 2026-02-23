@@ -1,76 +1,89 @@
 # 🚗 Flutter OBD2
 
-A **production-ready SAE J1979 OBD-II SDK for Flutter**.
+[![CI](https://github.com/AceBurgundy/Flutter-OBD2/actions/workflows/flutter.yml/badge.svg)](https://github.com/AceBurgundy/Flutter-OBD2/actions)
 
-Flutter OBD2 provides a clean, type-safe, and transport-agnostic interface for communicating with **ELM327-compatible Bluetooth Low Energy (BLE)** adapters using the **SAE J1979 (Generic OBD-II)** standard.
+A **modern SAE J1979 OBD-II SDK for Flutter**.
 
-> ⚙️ This SDK is intentionally focused on **SAE J1979 only**.
-> It does **not** implement UDS or manufacturer-specific protocols.
+Flutter OBD2 provides a clean, type-safe, and transport-focused interface for communicating with **ELM327-compatible Bluetooth Low Energy (BLE)** adapters using the **SAE J1979 (Generic OBD-II)** standard.
+
+> ⚙️ This SDK intentionally supports **SAE J1979 only**.  
+> It does **not** implement UDS or manufacturer-specific diagnostic protocols.
+
+## 📦 Current Release Status
+
+**Version:** `0.9.x` (Stabilization Phase)
+
+- ✅ Mode 01 (Live Telemetry) — Fully validated
+- 🚧 Modes 02–04 — Implemented, limited real-world validation
+- 🧪 Full unit test coverage with CI integration
+- 🏗 Architecture finalized for 1.0 milestone
 
 ## 📊 Example Dashboard
 
 ![Telemetry Dashboard](screenshots/dashboard.jpg)
 
-## ✨ Why This Package?
+# ✨ Why Flutter OBD2?
 
 Most OBD libraries:
 
-* Mix transport and protocol logic
-* Expose raw hex responses
-* Require manual PID parsing
-* Overload the ECU with bad polling loops
+- Mix transport and protocol logic  
+- Expose raw hex responses  
+- Require manual PID parsing  
+- Overload the ECU with unsafe polling  
 
-Flutter OBD2:
+Flutter OBD2 provides:
 
-* ✅ Clean layered architecture
-* ✅ Type-safe PID definitions
-* ✅ Intelligent polling engine
-* ✅ Formula evaluation engine
-* ✅ Greedy BLE compatibility layer
-* ✅ SAE J1979-focused design
+- ✅ Clean layered architecture  
+- ✅ Strongly typed `DetailedPID<T>` system  
+- ✅ Intelligent, collision-safe polling engine  
+- ✅ Formula evaluation engine  
+- ✅ Greedy BLE compatibility layer  
+- ✅ Strict SAE J1979 implementation  
 
 This is a **diagnostic SDK**, not just a Bluetooth wrapper.
 
-# 📦 Architecture Overview
-
-The SDK follows a protocol-bound layered design.
+# 🏗 Architecture Overview
 
 ```
-BluetoothAdapterOBD2 (BLE Transport)
+BluetoothAdapterOBD2  (BLE Transport)
         ↓
-AdapterOBD2 (Core Engine)
+AdapterOBD2           (Core Engine)
         ↓
-protocol (SaeJ1979)
+SaeJ1979 Protocol
         ├── telemetry
         ├── freezeFrame
         ├── readCodes
         └── clearCodes
 ```
 
-### Layer Responsibilities
+## 🔌 Transport Layer — `BluetoothAdapterOBD2`
 
-### 🔌 Transport Layer
+Handles:
 
-* BLE connection
-* GATT discovery
-* Characteristic subscription
-* Raw byte streaming
+- BLE connection
+- GATT discovery
+- Characteristic subscription
+- Raw byte streaming
+- ELM327 initialization
 
-### 🧠 Core Engine (`AdapterOBD2`)
+## 🧠 Core Engine — `AdapterOBD2`
 
-* ELM327 initialization
-* ASCII encoding / decoding
-* Command lifecycle
-* Response buffering
-* Formula evaluation
-* PID dispatching
+Handles:
 
-### 🏎️ SAE J1979 Protocol
+- ASCII encoding / decoding
+- Command lifecycle
+- Response buffering
+- Formula evaluation
+- PID dispatching
 
-* PID definitions
-* Mode grouping
-* Byte extraction rules
-* Diagnostic parsing
+## 🏎 SAE J1979 Protocol
+
+Provides:
+
+- PID definitions
+- Mode grouping
+- Byte extraction logic
+- Diagnostic parsing rules
 
 # 🚀 Getting Started
 
@@ -78,11 +91,11 @@ protocol (SaeJ1979)
 
 ```yaml
 dependencies:
-  obd2: ^1.0.0
-  flutter_blue_plus: ^1.30.0
+  obd2: ^0.9.0
+  flutter_blue_plus: ^2.1.0
 ```
 
-## 2️⃣ Connect to an Adapter
+## 2️⃣ Connect to Adapter
 
 ```dart
 import 'package:obd2/obd2.dart';
@@ -95,12 +108,12 @@ await adapter.connect(myBluetoothDevice);
 
 The adapter automatically:
 
-* Connects
-* Discovers services
-* Subscribes to notify/indicate characteristics
-* Selects writable pipe
-* Sends AT initialization commands
-* Negotiates protocol
+- Connects
+- Discovers services
+- Subscribes to notify/indicate characteristics
+- Selects writable pipe
+- Sends AT initialization commands
+- Negotiates protocol
 
 No protocol injection required.
 
@@ -124,25 +137,25 @@ final session = telemetry.stream(
   },
 );
 
-// Stop streaming later
+// Stop later
 session.stop();
 ```
 
-### Features
+### Telemetry Engine Features
 
-* Respects `bestPollingIntervalMs`
-* Prevents ECU overload
-* Collision-safe command loop
-* Fully type-safe
+- Respects `bestPollingIntervalMs`
+- Prevents ECU flooding
+- Collision-safe recursive loop
+- Type-safe PID retrieval
+- Timeout resilient
 
 # 🔍 Supported PID Discovery
 
-Detect real ECU support:
-
 ```dart
-final supported = await adapter.protocol.telemetry.detectSupportedTelemetry(validateAccessibility: true);
+final supported = await adapter.protocol.telemetry
+    .detectSupportedTelemetry(validateAccessibility: true);
 
-print("Supported PIDs: $supported");
+print("Supported: $supported");
 ```
 
 # 🧊 Mode 02 — Freeze Frame
@@ -178,16 +191,16 @@ print("Cleared: $success");
 
 # 🧬 Type-Safe PID System
 
-Every PID is defined as:
+Each PID is defined as:
 
 ```dart
 DetailedPID<T>
 ```
 
-Return types are enforced at compile time:
+Compile-time enforced return types:
 
 | Type           | Example        |
-| -------------- | -------------- |
+|---------------|---------------|
 | `double`       | RPM            |
 | `String`       | Fuel Type      |
 | `List<double>` | Lambda         |
@@ -195,121 +208,71 @@ Return types are enforced at compile time:
 
 No manual casting required.
 
-# 📊 Supported Mode 01 PIDs
-
-Available via:
-
-```dart
-adapter.protocol.telemetry
-```
-
-| PID           | Accessor             | Return Type    |
-| ------------- | -------------------- | -------------- |
-| Engine RPM    | `rpm`                | `double`       |
-| Vehicle Speed | `speed`              | `double`       |
-| Coolant Temp  | `coolantTemperature` | `double`       |
-| Engine Load   | `engineLoad`         | `double`       |
-| Fuel Level    | `fuelLevel`          | `double`       |
-| Mass Air Flow | `massAirFlow`        | `double`       |
-| Odometer      | `odometer`           | `double`       |
-| Lambda        | `lambdaBank1Sensor1` | `List<double>` |
-| Fuel Type     | `fuelType`           | `String`       |
-
 # 🔌 BLE Compatibility Strategy
 
 `BluetoothAdapterOBD2` uses a **Greedy Discovery Model**:
 
-1. Connects to device
-2. Discovers all services
-3. Subscribes to every notify/indicate characteristic
-4. Selects the best writable characteristic (FFF2/FFE1 preferred)
-5. Initializes adapter
+1. Connect
+2. Discover all services
+3. Subscribe to every notify/indicate characteristic
+4. Prefer standard ELM327 UUIDs (FFF2 / FFE1)
+5. Initialize adapter
 
 Designed for low-cost ELM327 clones.
 
 # 🧠 Public API Overview
 
-## Core Classes
-
-### `BluetoothAdapterOBD2`
-
-BLE transport implementation.
+## Core
 
 ```dart
 await adapter.connect(device);
 await adapter.disconnect();
 ```
 
-### `AdapterOBD2`
-
-Abstract core engine (extended internally).
-
-### `adapter.protocol`
-
-Exposes SAE J1979 functionality:
-
-* `telemetry`
-* `freezeFrame`
-* `readCodes`
-* `clearCodes`
-
-### `Telemetry`
+## SAE J1979 Access
 
 ```dart
-stream(...)
-query(...)
-detectSupportedTelemetry(...)
-calculateOdometer(...)
+adapter.protocol.telemetry
+adapter.protocol.freezeFrame
+adapter.protocol.readCodes
+adapter.protocol.clearCodes
 ```
 
-### `ReadCodes`
+# 🧪 Testing & CI
 
-```dart
-getDiagnosticTroubleCodes()
-```
-
-### `ClearCodes`
-
-```dart
-clearDiagnosticTroubleCodes()
-```
+- Full unit tests
+- `dart analyze` enforced
+- GitHub Actions CI
+- Mock adapter testing (no hardware required)
 
 # ⚠️ Testing Status
 
-| Mode    | Status                |
-| ------- | --------------------- |
-| Mode 01 | ✅ Fully Tested        |
-| Mode 02 | 🚧 Limited Validation |
-| Mode 03 | 🚧 Limited Validation |
-| Mode 04 | 🚧 Limited Validation |
+| Mode    | Validation Level |
+|----------|------------------|
+| Mode 01 | ✅ Fully Tested |
+| Mode 02 | 🚧 Partial |
+| Mode 03 | 🚧 Partial |
+| Mode 04 | 🚧 Partial |
 
-More real-vehicle validation planned for 1.x releases.
+Full real-world validation targeted for v1.0.0.
 
-# 🎯 Version 1.0 Positioning
+# 🎯 Road to 1.0
 
-Flutter OBD2 v1.0 is:
+Version 1.0.0 will signify:
 
-* Stable for real-time telemetry apps
-* Architecturally finalized
-* SAE J1979 focused
-* BLE optimized
-* Suitable for production dashboards and analytics apps
-
-Future roadmap may include:
-
-* Advanced DTC parsing improvements
-* UDS extension package (separate)
-* CAN frame debugging utilities
-* Performance telemetry batching
+- Complete real-world validation
+- Stable API commitment
+- Production-grade diagnostic reliability
 
 # 🧭 Design Philosophy
 
-This package:
+Flutter OBD2:
 
-* Focuses on **doing SAE J1979 correctly**
-* Avoids unnecessary multi-protocol abstraction
-* Separates transport from diagnostic logic
-* Prioritizes stability and clarity over feature overload
+- Implements SAE J1979 correctly
+- Avoids unnecessary abstraction
+- Separates transport from diagnostics
+- Prioritizes clarity over feature bloat
+- Is engineered for long-term stability
 
 # 📄 License
 

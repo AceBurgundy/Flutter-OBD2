@@ -17,14 +17,11 @@ import 'package:test/test.dart';
 /// - Capability bitmasks
 /// - DTC byte payloads
 class FakeAdapter extends AdapterOBD2 {
-  /// Simulated connection state.
   bool _connected = true;
 
-  /// Simulated incoming stream controller.
   final StreamController<List<int>> _controller =
-  StreamController.broadcast();
+      StreamController.broadcast();
 
-  /// Predefined response map keyed by PID.
   final Map<String, dynamic> _mockResponses;
 
   FakeAdapter(this._mockResponses);
@@ -36,16 +33,34 @@ class FakeAdapter extends AdapterOBD2 {
   Stream<List<int>> get incomingData => _controller.stream;
 
   @override
-  Future<void> write(List<int> data) async {}
+  Future<void> write(List<int> data) async {
+    // No-op for unit tests
+  }
 
   @override
   Future<void> disconnect() async {
     _connected = false;
   }
 
+  /// PID-level abstraction (used by older tests)
   @override
   Future<dynamic> queryPID(DetailedPID detailedPID) async {
     return _mockResponses[detailedPID.parameterID];
+  }
+
+  /// NEW: Service-level abstraction (used by Mode 03 / 04)
+  @override
+  Future<List<int>?> sendService(String serviceHex) async {
+    return _mockResponses[serviceHex] as List<int>?;
+  }
+
+  /// NEW: Service + PID abstraction (used by Mode 01 / 02)
+  @override
+  Future<List<int>?> sendServiceWithPID(
+      String serviceHex,
+      String parameterIDHex,
+  ) async {
+    return _mockResponses["$serviceHex$parameterIDHex"] as List<int>?;
   }
 }
 

@@ -331,6 +331,7 @@
         <entry key="flutter">
           <value>
             <list>
+              <option value="$PROJECT_DIR$/../../installation/packages/flutter/lib" />
               <option value="$PROJECT_DIR$/../../fvm/default/packages/flutter/lib" />
             </list>
           </value>
@@ -418,6 +419,7 @@
         <entry key="flutter_web_plugins">
           <value>
             <list>
+              <option value="$PROJECT_DIR$/../../installation/packages/flutter_web_plugins/lib" />
               <option value="$PROJECT_DIR$/../../fvm/default/packages/flutter_web_plugins/lib" />
             </list>
           </value>
@@ -950,6 +952,7 @@
         <entry key="sky_engine">
           <value>
             <list>
+              <option value="$PROJECT_DIR$/../../installation/bin/cache/pkg/sky_engine/lib" />
               <option value="$PROJECT_DIR$/../../fvm/default/bin/cache/pkg/sky_engine/lib" />
             </list>
           </value>
@@ -1445,6 +1448,9 @@
       <root url="file://$PROJECT_DIR$/../../fvm/default/packages/flutter/lib" />
       <root url="file://$PROJECT_DIR$/../../fvm/default/packages/flutter_test/lib" />
       <root url="file://$PROJECT_DIR$/../../fvm/default/packages/flutter_web_plugins/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/bin/cache/pkg/sky_engine/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/packages/flutter/lib" />
+      <root url="file://$PROJECT_DIR$/../../installation/packages/flutter_web_plugins/lib" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

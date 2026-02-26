@@ -56,10 +56,7 @@ void main() {
         '010C': 3000.0,
       });
 
-      final telemetry = Telemetry(adapter);
-
-      final result = await adapter.queryPID(telemetry.rpm);
-
+      final result = await adapter.queryPID(Telemetry.rpm);
       expect(result, 3000.0);
     });
 
@@ -68,10 +65,7 @@ void main() {
         '010D': 88.0,
       });
 
-      final telemetry = Telemetry(adapter);
-
-      final result = await adapter.queryPID(telemetry.speed);
-
+      final result = await adapter.queryPID(Telemetry.speed);
       expect(result, 88.0);
     });
   });
@@ -82,9 +76,7 @@ void main() {
         '0124': [1.0, 0.45],
       });
 
-      final telemetry = Telemetry(adapter);
-
-      final result = await adapter.queryPID(telemetry.lambdaBank1Sensor1);
+      final result = await adapter.queryPID(Telemetry.lambdaBank1Sensor1);
 
       expect(result, isA<List<double>>());
       expect(result.length, 2);
@@ -106,51 +98,40 @@ void main() {
   });
 
   group('Odometer Calculation Tests', () {
-    test('Odometer should increment correctly', () async {
-      final adapter = FakeAdapter({});
-      final telemetry = Telemetry(adapter);
+    test('Odometer should increment correctly', () {
+      final engine = OdometerEngine(1000.0);
 
-      final DateTime lastUpdate =
-      DateTime.now().subtract(const Duration(hours: 1));
+      final start = DateTime.now();
+      engine.start(start);
 
-      final newValue = await telemetry.calculateOdometer(
-        currentOdometer: 1000.0,
-        currentSpeedKmh: 60.0,
-        lastUpdateTime: lastUpdate,
-      );
+      final next = start.add(const Duration(seconds: 30));
 
-      expect(newValue > 1000.0, true);
+      engine.update(60.0, next); // 60 km/h for 30 seconds
+
+      expect(engine.value > 1000.0, true);
     });
 
-    test('Odometer should not increment under GPS drift threshold', () async {
-      final adapter = FakeAdapter({});
-      final telemetry = Telemetry(adapter);
+    test('Odometer should not increment under GPS drift threshold', () {
+      final engine = OdometerEngine(1000.0);
 
-      final DateTime lastUpdate =
-      DateTime.now().subtract(const Duration(hours: 1));
+      final start = DateTime.now();
+      engine.start(start);
 
-      final newValue = await telemetry.calculateOdometer(
-        currentOdometer: 1000.0,
-        currentSpeedKmh: 2.0,
-        lastUpdateTime: lastUpdate,
-      );
+      final next = start.add(const Duration(seconds: 30));
 
-      expect(newValue, 1000.0);
+      engine.update(0.2, next); // Below 0.5 km/h threshold
+
+      expect(engine.value, 1000.0);
     });
   });
 
   group('TelemetryData Type Safety Tests', () {
     test('Should store and retrieve typed values', () {
-      final telemetry = Telemetry(
-        FakeAdapter({}),
-      );
-
       final data = TelemetryData({
-        telemetry.rpm: 3500.0,
+        Telemetry.rpm: 3500.0,
       });
 
-      final rpm = data.get<double>(telemetry.rpm);
-
+      final rpm = data.get<double>(Telemetry.rpm);
       expect(rpm, 3500.0);
     });
   });
@@ -162,7 +143,6 @@ void main() {
       });
 
       final telemetry = Telemetry(adapter);
-
       final supported = await telemetry.detectSupportedTelemetry();
 
       expect(supported, isEmpty);

@@ -99,15 +99,14 @@ class TelemetryProvider extends ChangeNotifier {
     final telemetry = scanner!.protocol.telemetry;
 
     _activeSession = telemetry.stream(
-      pollIntervalMs: 30,
       detailedPIDs: [
-        telemetry.rpm,
-        telemetry.speed,
-        telemetry.coolantTemperature,
-        telemetry.throttlePosition,
-        telemetry.engineLoad,
-        telemetry.intakeAirTemperature,
-        telemetry.timingAdvance,
+        Telemetry.rpm,
+        Telemetry.speed,
+        Telemetry.coolantTemperature,
+        Telemetry.throttlePosition,
+        Telemetry.engineLoad,
+        Telemetry.intakeAirTemperature,
+        Telemetry.timingAdvance,
       ],
       onData: _processIncomingTelemetry,
     );
@@ -121,30 +120,28 @@ class TelemetryProvider extends ChangeNotifier {
   /// ### Parameters:
   /// - (`TelemetryData`) data: The raw packet received from the [TelemetrySession].
   void _processIncomingTelemetry(TelemetryData data) {
-    final telemetry = scanner!.protocol.telemetry;
-
-    if (data.hasData(telemetry.rpm) == true) {
-      engineRpm = data.get(telemetry.rpm);
+    if (data.hasData(Telemetry.rpm) == true) {
+      engineRpm = data.get(Telemetry.rpm);
     }
 
-    if (data.hasData(telemetry.speed) == true) {
-      vehicleSpeed = data.get(telemetry.speed);
+    if (data.hasData(Telemetry.speed) == true) {
+      vehicleSpeed = data.get(Telemetry.speed);
     }
 
-    if (data.hasData(telemetry.coolantTemperature) == true) {
-      coolantTemperature = data.get(telemetry.coolantTemperature);
+    if (data.hasData(Telemetry.coolantTemperature) == true) {
+      coolantTemperature = data.get(Telemetry.coolantTemperature);
     }
 
-    if (data.hasData(telemetry.throttlePosition) == true) {
-      throttlePosition = data.get(telemetry.throttlePosition);
+    if (data.hasData(Telemetry.throttlePosition) == true) {
+      throttlePosition = data.get(Telemetry.throttlePosition);
     }
 
-    if (data.hasData(telemetry.engineLoad) == true) {
-      engineLoad = data.get(telemetry.engineLoad);
+    if (data.hasData(Telemetry.engineLoad) == true) {
+      engineLoad = data.get(Telemetry.engineLoad);
     }
 
-    if (data.hasData(telemetry.timingAdvance) == true) {
-      timingAdvance = data.get(telemetry.timingAdvance);
+    if (data.hasData(Telemetry.timingAdvance) == true) {
+      timingAdvance = data.get(Telemetry.timingAdvance);
     }
 
     _requiresUIUpdate = true;

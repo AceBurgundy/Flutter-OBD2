@@ -1,3 +1,8 @@
+## 0.10.1
+
+- Fix FakeAdapter to support service-level execution (sendService / sendServiceWithPID)
+- No runtime changes
+  
 ## 0.10.0
 
 - Refactored core AdapterOBD2 to use service-level execution (sendService, sendServiceWithPID)

@@ -1,6 +1,6 @@
 name: obd2
 description: A production-ready SAE J1979 OBD-II SDK for Flutter with BLE support for ELM327-compatible adapters. Provides real-time telemetry, DTC parsing, and type-safe PID handling.
-version: 0.9.0
+version: 0.10.0
 repository: https://github.com/AceBurgundy/Flutter-OBD2
 homepage: https://github.com/AceBurgundy/Flutter-OBD2
 issue_tracker: https://github.com/AceBurgundy/Flutter-OBD2/issues

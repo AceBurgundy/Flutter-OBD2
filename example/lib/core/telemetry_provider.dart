@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:obd2/obd2.dart';
 import 'functions.dart';
@@ -12,8 +11,8 @@ class TelemetryProvider extends ChangeNotifier {
   /// The active streaming session for telemetry data.
   TelemetrySession? _activeSession;
 
-  /// The currently connected Bluetooth device.
-  BluetoothDevice? connectedDevice;
+  /// The currently connected Bluetooth device ID.
+  String? connectedDeviceId;
 
   /// A timer used to throttle UI updates to prevent main-thread jank.
   Timer? _displayUpdateTimer;
@@ -27,44 +26,35 @@ class TelemetryProvider extends ChangeNotifier {
   /// Indicates if a Bluetooth connection attempt is currently in progress.
   bool isConnecting = false;
 
-  /// Revolutions Per Minute: Current engine crank speed.
+  /// Revolutions Per Minute
   double? engineRpm;
 
-  /// Vehicle Speed: Current ground speed of the vehicle.
+  /// Vehicle Speed
   double? vehicleSpeed;
 
-  /// Coolant Temp: Current engine coolant temperature in Celsius.
+  /// Coolant Temp
   double? coolantTemperature;
 
-  /// Throttle Position Sensor: Current throttle opening percentage (0-100%).
+  /// Throttle Position
   double? throttlePosition;
 
-  /// Calculated Engine Load: The percentage of peak available torque being used.
+  /// Engine Load
   double? engineLoad;
 
-  /// Timing Advance: The ignition timing relative to Top Dead Center (TDC).
+  /// Timing Advance
   double? timingAdvance;
 
-  /// Initializes the provider and prepares data structures.
-  ///
-  /// ### Returns:
-  /// - (`Future<void>`): A future that completes when initialization is done.
   Future<void> initializeProvider() async {
     try {
       notifyListeners();
     } catch (error, stack) {
-      logError(error, stack, message: 'Failed to initialize vehicle data storage');
+      logError(error, stack,
+          message: 'Failed to initialize vehicle data storage');
     }
   }
 
-  /// Connects to a specific Bluetooth OBD-II dongle.
-  ///
-  /// ### Parameters:
-  /// - (`BluetoothDevice`) device: The device selected from the paired list.
-  ///
-  /// ### Returns:
-  /// - (`Future<void>`): A future that completes when the connection is established.
-  Future<void> connectToDevice(BluetoothDevice device) async {
+  /// Connect using deviceId instead of BluetoothDevice
+  Future<void> connectToDevice(String deviceId) async {
     isConnecting = true;
     notifyListeners();
 
@@ -74,23 +64,24 @@ class TelemetryProvider extends ChangeNotifier {
       }
 
       await scanner?.disconnect();
+
       scanner = BluetoothAdapterOBD2();
-      await scanner!.connect(device);
-      connectedDevice = device;
+
+      await scanner!.connect(deviceId);
+
+      connectedDeviceId = deviceId;
     } catch (error, stack) {
-      logError(error, stack, message: 'Could not establish connection to ${device.platformName}');
+      logError(
+        error,
+        stack,
+        message: 'Could not establish connection to $deviceId',
+      );
     } finally {
       isConnecting = false;
       notifyListeners();
     }
   }
 
-  /// Starts the high-priority telemetry stream and sets the polling interval.
-  ///
-  /// ### Usage:
-  /// ```dart
-  /// provider.startTelemetryStream();
-  /// ```
   void startTelemetryStream() {
     if (scanner == null) {
       throw Exception("Scanner is null");
@@ -115,32 +106,28 @@ class TelemetryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Internal handler for parsing raw OBD-II packets and triggering throttled updates.
-  ///
-  /// ### Parameters:
-  /// - (`TelemetryData`) data: The raw packet received from the [TelemetrySession].
   void _processIncomingTelemetry(TelemetryData data) {
-    if (data.hasData(Telemetry.rpm) == true) {
+    if (data.hasData(Telemetry.rpm)) {
       engineRpm = data.get(Telemetry.rpm);
     }
 
-    if (data.hasData(Telemetry.speed) == true) {
+    if (data.hasData(Telemetry.speed)) {
       vehicleSpeed = data.get(Telemetry.speed);
     }
 
-    if (data.hasData(Telemetry.coolantTemperature) == true) {
+    if (data.hasData(Telemetry.coolantTemperature)) {
       coolantTemperature = data.get(Telemetry.coolantTemperature);
     }
 
-    if (data.hasData(Telemetry.throttlePosition) == true) {
+    if (data.hasData(Telemetry.throttlePosition)) {
       throttlePosition = data.get(Telemetry.throttlePosition);
     }
 
-    if (data.hasData(Telemetry.engineLoad) == true) {
+    if (data.hasData(Telemetry.engineLoad)) {
       engineLoad = data.get(Telemetry.engineLoad);
     }
 
-    if (data.hasData(Telemetry.timingAdvance) == true) {
+    if (data.hasData(Telemetry.timingAdvance)) {
       timingAdvance = data.get(Telemetry.timingAdvance);
     }
 
@@ -148,11 +135,11 @@ class TelemetryProvider extends ChangeNotifier {
     _runThrottledUpdate();
   }
 
-  /// Throttles the [notifyListeners] call to ~30 FPS to maintain UI performance.
   void _runThrottledUpdate() {
     if (_displayUpdateTimer?.isActive ?? false) return;
 
-    _displayUpdateTimer = Timer(const Duration(milliseconds: 33), () {
+    _displayUpdateTimer =
+        Timer(const Duration(milliseconds: 33), () {
       if (_requiresUIUpdate) {
         notifyListeners();
         _requiresUIUpdate = false;
@@ -160,7 +147,6 @@ class TelemetryProvider extends ChangeNotifier {
     });
   }
 
-  /// Terminates all active OBD-II streams and cancels the UI update timer.
   void stopTelemetryStream() {
     _activeSession?.stop();
     _displayUpdateTimer?.cancel();
@@ -168,11 +154,11 @@ class TelemetryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Properly closes resources when the provider is removed from the widget tree.
   @override
   void dispose() {
     stopTelemetryStream();
     _displayUpdateTimer?.cancel();
+    scanner?.disconnect();
     super.dispose();
   }
 }

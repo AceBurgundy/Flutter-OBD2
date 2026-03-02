@@ -1,56 +1,37 @@
-// bluetooth_helper.dart
-
+import 'dart:async';
 import 'dart:io';
 import 'package:example/main.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:universal_ble/universal_ble.dart';
 import 'functions.dart';
 import 'permission_manager.dart';
 import 'telemetry_provider.dart';
 
 class BluetoothHelper {
-
-  static Future<void> handleShowDevices(BuildContext context, TelemetryProvider provider) async {
+  static Future<void> handleShowDevices(
+      BuildContext context, TelemetryProvider provider) async {
     try {
-      // Check if Bluetooth is supported on the device
-      if (await FlutterBluePlus.isSupported == false) {
+      // 1️⃣ Check BLE support
+      final bool isSupported = await UniversalBle.isSupported;
+
+      if (!isSupported) {
         if (!context.mounted) return;
         snackBar(context, 'Bluetooth is not supported on this device');
         return;
       }
 
-      // Checking the current Bluetooth state
-      final BluetoothAdapterState state = await FlutterBluePlus.adapterState.first;
+      // 2️⃣ Check Bluetooth state
+      final availability = await UniversalBle.getBluetoothAvailabilityState();
 
-      if (state == BluetoothAdapterState.off) {
-        if (Platform.isAndroid) {
-          try {
-            await FlutterBluePlus.turnOn();
-          } catch (e) {
-            if (!context.mounted) return;
-            snackBar(context, 'Please turn on Bluetooth manually');
-          }
-        } else {
-          if (!context.mounted) return;
-          snackBar(context, 'Please turn on Bluetooth manually');
-        }
-        return;
-      }
-
-      if (state == BluetoothAdapterState.unauthorized) {
+      if (availability != BleAvailabilityState.poweredOn) {
         if (!context.mounted) return;
-        snackBar(context, 'Bluetooth permissions missing. Please check your settings');
+        snackBar(context, 'Please turn on Bluetooth');
         return;
       }
 
-      if (state != BluetoothAdapterState.on) {
-        if (!context.mounted) return;
-        snackBar(context, 'Bluetooth status: ${state.name}. Please wait or check settings');
-        return;
-      }
-
-      // Permissions and device fetching
-      final bool hasPermission = await PermissionManager.requestHardwarePermissions();
+      // 3️⃣ Request permissions
+      final bool hasPermission =
+          await PermissionManager.requestHardwarePermissions();
 
       if (!hasPermission) {
         if (!context.mounted) return;
@@ -58,38 +39,63 @@ class BluetoothHelper {
         return;
       }
 
-      final List<BluetoothDevice> pairedDevices = await FlutterBluePlus.bondedDevices;
+      // 4️⃣ Start scanning instead of bondedDevices
+      final List<DiscoveredDevice> discoveredDevices = [];
+      final StreamSubscription scanSub =
+          UniversalBle.scanStream.listen((device) {
+        if (!discoveredDevices
+            .any((d) => d.deviceId == device.deviceId)) {
+          discoveredDevices.add(device);
+        }
+      });
+
+      await UniversalBle.startScan();
+
+      // Scan for 4 seconds
+      await Future.delayed(const Duration(seconds: 4));
+      await UniversalBle.stopScan();
+      await scanSub.cancel();
 
       if (!context.mounted) return;
 
-      if (pairedDevices.isEmpty) {
-        snackBar(context, 'No paired devices found. Please pair a device in settings first');
+      if (discoveredDevices.isEmpty) {
+        snackBar(context, 'No BLE devices found nearby');
         return;
       }
 
-      // Show the selection dialog
+      // 5️⃣ Show selection dialog
       showDialog(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text(
-              'Select OBD-II Adapter', style: TextStyle(color: Colors.white)
+            'Select OBD-II Adapter',
+            style: TextStyle(color: Colors.white),
           ),
           backgroundColor: background,
           content: SizedBox(
             width: double.maxFinite,
             child: ListView.builder(
               shrinkWrap: true,
-              itemCount: pairedDevices.length,
+              itemCount: discoveredDevices.length,
               itemBuilder: (context, index) {
-                final device = pairedDevices[index];
+                final device = discoveredDevices[index];
+
                 return ListTile(
-                  leading: const Icon(Icons.bluetooth, color: Colors.white),
+                  leading:
+                      const Icon(Icons.bluetooth, color: Colors.white),
                   title: Text(
-                      device.platformName.isNotEmpty ? device.platformName : "Unknown Device",
-                      style: TextStyle(color: Colors.white)
+                    device.name?.isNotEmpty == true
+                        ? device.name!
+                        : "Unknown Device",
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    device.deviceId,
+                    style: const TextStyle(
+                        color: Colors.white54, fontSize: 12),
                   ),
                   onTap: () {
-                    provider.connectToDevice(device);
+                    provider.connectToDevice(device.deviceId);
                     Navigator.pop(dialogContext);
                   },
                 );
@@ -102,11 +108,12 @@ class BluetoothHelper {
       logError(
         error,
         stack,
-        message: 'Failed to retrieve paired Bluetooth devices',
+        message: 'Failed to retrieve Bluetooth devices',
       );
 
       if (context.mounted) {
-        snackBar(context, 'An error occurred while fetching Bluetooth devices');
+        snackBar(
+            context, 'An error occurred while fetching Bluetooth devices');
       }
     }
   }

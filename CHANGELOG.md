@@ -1,3 +1,12 @@
+## 0.10.2
+
+- Added human-perception telemetry throttling to EDF scheduler to prevent unnecessary high-frequency polling
+- Introduced minimum human-visible interval control for telemetry streaming
+- Reduced ELM327 and BLE adapter load without affecting perceived real-time updates
+- Improved scheduler stability under high PID counts
+- Minor internal scheduler optimizations and documentation improvements
+- No breaking API changes
+  
 ## 0.10.1
 
 - Fix FakeAdapter to support service-level execution (sendService / sendServiceWithPID)

@@ -1,102 +1,96 @@
 import 'dart:async';
 
+import 'package:obd2/src/core/standard_ids.dart';
+
 import '../../../obd2.dart';
 import '../adapter_series/adapter_obd2.dart';
-import '../standard_ids.dart';
 
 /// SAE = Society of Automotive Engineers
 /// PID = Parameter Identifier
 /// ECU = Engine Control Unit
-/// AFR = Air Fuel Ratio
-/// DTC = Diagnostic Trouble Code
-/// GPS = Global Positioning System
 /// EMA = Exponential Moving Average
 /// EDF = Earliest Deadline First
 /// QPS = Queries Per Second
 
-/// Represents a scheduled telemetry task used by the internal scheduler.
+/// Represents a scheduled telemetry task managed by the EDF scheduler.
 ///
-/// Each scheduled task corresponds to a single [DetailedPID] and maintains:
-/// - The associated PID metadata
-/// - Its fixed polling interval
-/// - The next execution timestamp in epoch milliseconds
-///
-/// This class is strictly internal and used by the Min-Heap scheduler
-/// to implement an Earliest Deadline First (EDF) scheduling strategy.
-///
-/// In EDF scheduling:
-/// The task with the smallest [nextDueTimeMilliseconds] is executed first.
+/// Each task tracks execution timing and perceptual throttling
+/// used to prevent unnecessary ECU polling.
 class _ScheduledTelemetryTask {
 
-  /// The PID metadata associated with this scheduled task.
-  ///
-  /// This defines:
-  /// - The parameter ID (e.g., "010C")
-  /// - The decoding formula
-  /// - Units
-  /// - Best polling interval
+  /// Metadata describing the telemetry parameter.
   final DetailedPID detailedPID;
 
-  /// Polling interval in milliseconds.
-  ///
-  /// This represents the desired time between successive executions.
+  /// Desired polling interval defined by PID metadata.
   final int intervalMilliseconds;
 
-  /// The next time (in epoch milliseconds) that this PID should execute.
+  /// Minimum interval allowed based on human perception limits.
   ///
-  /// This value is dynamically updated after every execution.
+  /// Prevents querying faster than users can visually perceive updates.
+  final int minimumHumanVisibleIntervalMilliseconds;
+
+  /// Epoch timestamp representing the next execution time.
   int nextDueTimeMilliseconds;
 
-  /// Creates a scheduled telemetry task.
+  /// Creates a scheduled telemetry task instance.
   ///
-  /// ### Parameters:
-  /// - [detailedPID]: The PID metadata.
-  /// - [intervalMilliseconds]: Polling interval in milliseconds.
-  /// - [nextDueTimeMilliseconds]: First execution timestamp.
+  /// Use [detailedPID] to define the telemetry parameter.
   _ScheduledTelemetryTask({
-    required this.detailedPID, required this.intervalMilliseconds, required this.nextDueTimeMilliseconds
+    required this.detailedPID,
+    required this.intervalMilliseconds,
+    required this.minimumHumanVisibleIntervalMilliseconds,
+    required this.nextDueTimeMilliseconds,
   });
 }
-
-/// Lightweight Min-Heap (Priority Queue) implementation.
+/// A lightweight Min-Heap data structure specifically ordered by the next 
+/// execution timestamp of telemetry tasks.
 ///
-/// This heap is sorted by [nextDueTimeMilliseconds].
-///
-/// Complexity:
-/// - O(log n) insertion
-/// - O(log n) removal
-/// - O(1) access to earliest task
-///
-/// The earliest scheduled task is always located at index 0.
+/// This implementation ensures that the task with the earliest execution 
+/// time is always at the root of the heap.
 class _TelemetryMinHeap {
-
-  /// Internal heap storage.
-  ///
-  /// Maintains the heap property based on [nextDueTimeMilliseconds].
+  /// Internal storage for the binary heap using a contiguous list.
   final List<_ScheduledTelemetryTask> _heap = [];
 
-  /// Returns whether the heap is empty.
+  /// Returns true if the heap contains no telemetry tasks.
   bool get isEmpty => _heap.isEmpty;
 
-  /// Returns the earliest scheduled task without removing it.
+  /// Retrieves the earliest scheduled telemetry task without removing it.
   _ScheduledTelemetryTask get first => _heap.first;
 
-  /// Adds a new task to the heap.
+  /// Inserts a new task into the heap and re-orders it to maintain heap property.
   ///
-  /// Complexity: O(log n)
+  /// Use [scheduledTelemetryTask] to define the task and its timing to be added.
+  ///
+  /// ### Parameters
+  /// - [scheduledTelemetryTask] (`_ScheduledTelemetryTask`): The task object 
+  /// containing the payload and the target execution timestamp.
+  ///
+  /// ### Usage
+  /// ```dart
+  /// heap.add(task);
+  /// ```
   void add(_ScheduledTelemetryTask scheduledTelemetryTask) {
     _heap.add(scheduledTelemetryTask);
     _bubbleUp(_heap.length - 1);
   }
 
-  /// Removes and returns the earliest scheduled task.
+  /// Removes and returns the task with the earliest scheduled execution time.
   ///
-  /// Complexity: O(log n)
+  /// ### Returns
+  /// - (`_ScheduledTelemetryTask`): The task that was due soonest.
+  ///
+  /// ### Throws
+  /// * [StateError]: If the heap is empty.
   _ScheduledTelemetryTask removeFirst() {
     final _ScheduledTelemetryTask firstTask = _heap.first;
     final _ScheduledTelemetryTask lastTask = _heap.removeLast();
 
     if (_heap.isNotEmpty) {
+      /*
+       * After removing the root, we move the last element in the list 
+       * to the top and perform a 'bubble down' operation to restore 
+       * the min-heap order based on timestamps.
+       */
       _heap[0] = lastTask;
       _bubbleDown(0);
     }
@@ -104,54 +98,62 @@ class _TelemetryMinHeap {
     return firstTask;
   }
 
-  /// Restores heap ordering by moving a node upward.
+  /// Moves an element upward in the tree until the min-heap property is restored.
   ///
-  /// This method compares the current node with its parent and swaps
-  /// them if the current node has an earlier due time.
-  ///
-  /// ### Parameters:
-  /// - [index]: Index of the node to bubble upward.
+  /// ### Parameters
+  /// - [index] (`int`): The starting position of the element to move up.
   void _bubbleUp(int index) {
     while (index > 0) {
+      // Calculates the parent index in a zero-indexed binary tree.
       final int parentIndex = (index - 1) ~/ 2;
 
-      if (_heap[index].nextDueTimeMilliseconds >= _heap[parentIndex].nextDueTimeMilliseconds) {
+      // If the current element is not earlier than its parent, the heap is valid.
+      if (_heap[index].nextDueTimeMilliseconds >=
+          _heap[parentIndex].nextDueTimeMilliseconds) {
         break;
       }
 
       final _ScheduledTelemetryTask temporary = _heap[index];
       _heap[index] = _heap[parentIndex];
       _heap[parentIndex] = temporary;
-      index = parentIndex;
+
+      index = parentIndex; // Move tracking index to the parent's old position
     }
   }
 
-  /// Restores heap ordering by moving a node downward.
+  /// Moves an element downward in the tree until the min-heap property is restored.
   ///
-  /// This method selects the smallest child and swaps if necessary.
-  ///
-  /// ### Parameters:
-  /// - [index]: Index of the node to bubble downward.
+  /// ### Parameters
+  /// - [index] (`int`): The starting position of the element to move down.
   void _bubbleDown(int index) {
     while (true) {
       final int leftChildIndex = index * 2 + 1;
       final int rightChildIndex = index * 2 + 2;
+
       int smallestIndex = index;
 
-      if (leftChildIndex < _heap.length && _heap[leftChildIndex].nextDueTimeMilliseconds < _heap[smallestIndex].nextDueTimeMilliseconds) {
+      if (leftChildIndex < _heap.length &&
+          _heap[leftChildIndex].nextDueTimeMilliseconds <
+              _heap[smallestIndex].nextDueTimeMilliseconds) {
         smallestIndex = leftChildIndex;
       }
 
-      if (rightChildIndex < _heap.length && _heap[rightChildIndex].nextDueTimeMilliseconds < _heap[smallestIndex].nextDueTimeMilliseconds) {
+      if (rightChildIndex < _heap.length &&
+          _heap[rightChildIndex].nextDueTimeMilliseconds <
+              _heap[smallestIndex].nextDueTimeMilliseconds) {
         smallestIndex = rightChildIndex;
       }
 
-      if (smallestIndex == index) break;
+      // If the current index is smaller than both children, the heap is valid.
+      if (smallestIndex == index) {
+        break;
+      }
 
       final _ScheduledTelemetryTask temporary = _heap[index];
       _heap[index] = _heap[smallestIndex];
       _heap[smallestIndex] = temporary;
-      index = smallestIndex;
+
+      index = smallestIndex; // Continue checking from the new child position
     }
   }
 }
@@ -814,184 +816,196 @@ class Telemetry {
   /// - Running on mobile CPUs
   /// - Using Bluetooth adapters
   ///
-  /// ### Parameters:
-  /// - [detailedPIDs] (`List<DetailedPID>`): required List of PIDs to stream.
-  /// - [onData] (`void Function(TelemetryData)`): Callback invoked every time a PID returns data.
-  /// - [maxQueriesPerSecond] (`int`=25): Hard safety cap on query rate.
-  /// - [latencySmoothingFactor] (`double`):
-  ///     double EMA smoothing coefficient.
-  ///     Range: 0.0–1.0
-  ///     Lower = more stable
-  ///     Higher = more reactive
+  /// ### Parameters
+  /// - [detailedPIDs] (`List<DetailedPID>`): A list of parameter identifiers 
+  /// to be queried.
+  /// - [onData] (`void Function(TelemetryData)`): A callback triggered when 
+  /// new data is received.
+  /// - [maxQueriesPerSecond] (`int`): The maximum allowed requests per second 
+  /// to prevent adapter saturation.
+  /// - [latencySmoothingFactor] (`double`): Weight given to the most recent 
+  /// latency measurement (0.0 to 1.0).
+  /// - [minimumHumanVisibleIntervalMilliseconds] (`int`): The floor for polling 
+  /// intervals to save processing power, as humans cannot perceive updates 
+  /// faster than ~16Hz.
+  ///
   ///
   /// ### Returns
   /// - (`TelemetrySession`): Allows caller to stop the scheduler safely.
   ///
   /// ### Throws
   /// - (`StateError`): If adapter is not connected.
-  ///
   TelemetrySession stream({
     required List<DetailedPID> detailedPIDs,
     required void Function(TelemetryData) onData,
     int maxQueriesPerSecond = 25,
     double latencySmoothingFactor = 0.2,
+    int minimumHumanVisibleIntervalMilliseconds = 60,
   }) {
-    // Prevent undefined behavior if adapter is disconnected.
     if (!_adapter.isConnected) {
       throw StateError('Adapter is not connected.');
     }
 
-    // Min-Heap implementing Earliest Deadline First scheduling.
+    /// Priority queue to manage the execution order of telemetry tasks.
     final _TelemetryMinHeap heap = _TelemetryMinHeap();
 
-    // Initialize all tasks as immediately due.
-    // They will naturally stagger after first execution.
-    final int startTimeMilliseconds = DateTime.now().millisecondsSinceEpoch;
+    /// Reference point for the start of the telemetry session.
+    final int startTimeMilliseconds =
+        DateTime.now().millisecondsSinceEpoch;
 
     for (final DetailedPID detailedPID in detailedPIDs) {
       heap.add(
         _ScheduledTelemetryTask(
           detailedPID: detailedPID,
           intervalMilliseconds: detailedPID.pollingIntervalMs,
+          minimumHumanVisibleIntervalMilliseconds:
+              minimumHumanVisibleIntervalMilliseconds,
           nextDueTimeMilliseconds: startTimeMilliseconds,
         ),
       );
     }
 
-    /// Token Bucket Governor
-
-    // Convert once to double to avoid repeated conversions.
+    /// The capacity of the token bucket.
     final double maximumTokens = maxQueriesPerSecond.toDouble();
-
-    // Current available permits.
+    
+    /// Current available tokens for making requests.
     double tokens = maximumTokens;
-
-    // Tokens regenerated per second.
+    
+    /// The speed at which tokens are added back to the bucket.
     final double refillRatePerSecond = maximumTokens;
 
-    // Tracks last refill timestamp.
+    /// Tracks the last time the token bucket was replenished.
     int lastRefillTimestampMilliseconds = startTimeMilliseconds;
 
-    /// Adaptive Latency Tracking
-
-    // EMA running average.
+    /// Running average of the time taken for a single OBD-II request.
     double averageLatencyMilliseconds = 10.0;
+    
+    /// The inverse of the smoothing factor used for the weighted moving average.
+    final double latencyRetentionFactor =
+        1.0 - latencySmoothingFactor;
 
-    // Precompute retention factor to avoid repeated subtraction.
-    final double latencyRetentionFactor = 1.0 - latencySmoothingFactor;
-
-    // Precompute milliseconds-to-seconds conversion constant.
+    /// Constant for converting milliseconds to seconds in rate calculations.
     const double millisecondsToSeconds = 1.0 / 1000.0;
 
+    /// Control flag to stop the asynchronous scheduler loop.
     bool isRunning = true;
 
+    /// Internal asynchronous loop that manages the timing and execution of queries.
     Future<void> schedulerLoop() async {
       while (isRunning && _adapter.isConnected) {
+        if (heap.isEmpty) {
+          break;
+        }
 
-        if (heap.isEmpty) break;
+        final int nowMilliseconds =
+            DateTime.now().millisecondsSinceEpoch;
 
-        // Capture current time ONCE per loop iteration.
-        final int nowMilliseconds = DateTime.now().millisecondsSinceEpoch;
-
-        /// Token Refill Step
-        ///
-        /// elapsedSeconds =
-        ///     (currentTime - lastRefillTime) / 1000
-        ///
-        /// Multiply instead of divide to reduce cost.
-        ///
-        final double elapsedSeconds = (nowMilliseconds - lastRefillTimestampMilliseconds) * millisecondsToSeconds;
+        /*
+        * Token Bucket Refill Calculation:
+        * * We calculate how much time has passed since the last refill and 
+        * convert that to a fractional amount of tokens based on the refill rate.
+        */
+        final double elapsedSeconds =
+            (nowMilliseconds - lastRefillTimestampMilliseconds) *
+                millisecondsToSeconds;
 
         tokens += elapsedSeconds * refillRatePerSecond;
 
-        // Prevent bucket overflow.
-        if (tokens > maximumTokens) tokens = maximumTokens;
+        // Ensure the bucket does not overflow past the defined maximum capacity.
+        if (tokens > maximumTokens) {
+          tokens = maximumTokens;
+        }
 
         lastRefillTimestampMilliseconds = nowMilliseconds;
 
-        final _ScheduledTelemetryTask scheduledTelemetryTask = heap.first;
+        final _ScheduledTelemetryTask scheduledTelemetryTask =
+            heap.first;
 
-        /// Deadline Check
-        ///
-        /// If the task is scheduled in the future,
-        /// sleep exactly until that time.
-        ///
-        if (scheduledTelemetryTask.nextDueTimeMilliseconds > nowMilliseconds) {
-          final int waitMilliseconds = scheduledTelemetryTask.nextDueTimeMilliseconds - nowMilliseconds;
-          await Future.delayed(Duration(milliseconds: waitMilliseconds));
+        // If the soonest task is not yet due, wait until it is ready.
+        if (scheduledTelemetryTask.nextDueTimeMilliseconds >
+            nowMilliseconds) {
+          final int waitMilliseconds =
+              scheduledTelemetryTask.nextDueTimeMilliseconds -
+                  nowMilliseconds;
+
+          await Future.delayed(
+            Duration(milliseconds: waitMilliseconds),
+          );
+
           continue;
         }
 
-        /// Token Availability Check
-        ///
-        /// If no token is available, briefly yield to avoid CPU spinning.
-        ///
+        // If the rate limit is reached (no tokens available), yield control briefly.
         if (tokens < 1.0) {
           await Future.delayed(const Duration(milliseconds: 2));
           continue;
         }
 
-        // Remove task before executing to maintain heap integrity.
+        // Execute task: Remove from heap and consume one token.
         heap.removeFirst();
         tokens -= 1.0;
 
-        // Capture query start timestamp.
         final int queryStartMilliseconds = nowMilliseconds;
-
-        // Declare queryEndMilliseconds outside try block
-        // so it remains in scope for adaptive scheduling.
         int queryEndMilliseconds = queryStartMilliseconds;
 
         try {
-          final DetailedPID detailedPID = scheduledTelemetryTask.detailedPID;
-          final dynamic value = await _adapter.queryPID(detailedPID);
+          final dynamic value =
+              await _adapter.queryPID(scheduledTelemetryTask.detailedPID);
 
-          queryEndMilliseconds = DateTime.now().millisecondsSinceEpoch;
+          queryEndMilliseconds =
+              DateTime.now().millisecondsSinceEpoch;
 
-          final int latencyMilliseconds = queryEndMilliseconds - queryStartMilliseconds;
+          final int latencyMilliseconds =
+              queryEndMilliseconds - queryStartMilliseconds;
 
-          /// EMA Update
-          ///
-          /// newAverage =
-          ///     oldAverage * retentionFactor +
-          ///     latency * smoothingFactor
-          ///
+          /*
+          * Adaptive Latency Calculation:
+          * * Uses a weighted moving average to track how responsive the 
+          * Bluetooth/ECU connection is.
+          */
           averageLatencyMilliseconds =
               (averageLatencyMilliseconds * latencyRetentionFactor) +
                   (latencyMilliseconds * latencySmoothingFactor);
 
-          onData(TelemetryData({detailedPID: value}));
-
-        } catch (_) {
-          // Failures are isolated to individual PIDs.
-          // Scheduler stability is preserved.
-
-          // Even on failure, update end time to prevent
-          // artificial compression of scheduling.
-          queryEndMilliseconds = DateTime.now().millisecondsSinceEpoch;
+          onData(
+            TelemetryData({
+              scheduledTelemetryTask.detailedPID: value,
+            }),
+          );
+        } catch (error) {
+          queryEndMilliseconds =
+              DateTime.now().millisecondsSinceEpoch;
         }
 
-        /// Adaptive Spacing
-        ///
-        /// Clamp latency-derived spacing to safe bounds.
-        ///
-        /// 5ms minimum:
-        ///     Prevents ultra-tight loops.
-        ///
-        /// 200ms maximum:
-        ///     Prevents runaway slowdown.
-        ///
-        final int adaptiveSpacingMilliseconds = averageLatencyMilliseconds.clamp(5, 200).toInt();
+        /*
+        * Perceptual throttling and Adaptive Spacing:
+        *
+        * This logic prevents scheduling faster than humans can perceive 
+        * (typically ~16 FPS on a dashboard) and adds a 'safety buffer' 
+        * based on the current connection latency to prevent queue buildup.
+        */
+        final int perceptualIntervalMilliseconds =
+            scheduledTelemetryTask.intervalMilliseconds <
+                    scheduledTelemetryTask
+                        .minimumHumanVisibleIntervalMilliseconds
+                ? scheduledTelemetryTask.minimumHumanVisibleIntervalMilliseconds
+                : scheduledTelemetryTask.intervalMilliseconds;
+
+        // Spacing is clamped to prevent extreme delays or impossible speeds.
+        final int adaptiveSpacingMilliseconds =
+            averageLatencyMilliseconds.clamp(5.0, 200.0).toInt();
 
         scheduledTelemetryTask.nextDueTimeMilliseconds =
             queryEndMilliseconds +
-                scheduledTelemetryTask.intervalMilliseconds +
+                perceptualIntervalMilliseconds +
                 adaptiveSpacingMilliseconds;
 
+        // Re-add the task to the heap with its newly updated schedule.
         heap.add(scheduledTelemetryTask);
       }
     }
 
+    // Trigger the top-level loop without awaiting, as it is a long-running process.
     schedulerLoop();
 
     return TelemetrySession(() {
